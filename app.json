@@ -5,11 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/logo.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./src/assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#C3D9CA"
+      "backgroundColor": "#101713",
+      "dark": {
+        "image": "./src/assets/logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#101713"
+      }
     },
     "scheme": "ecopick",
     "ios": {
@@ -17,7 +22,7 @@
       "splash": {
         "image": "./src/assets/logo.png",
         "resizeMode": "contain",
-        "backgroundColor": "#C3D9CA"
+        "backgroundColor": "#101713"
       }
     },
     "android": {
@@ -29,17 +34,19 @@
       "splash": {
         "image": "./src/assets/logo.png",
         "resizeMode": "contain",
-        "backgroundColor": "#C3D9CA"
+        "backgroundColor": "#101713"
       },
       "predictiveBackGestureEnabled": false,
-      "config": {
-        "googleMaps": {
-          "apiKey": "AlzaSyAYyF2UqbWg1w0x3lI3SZQv30Ug1JKTqVI"
-        }
-      },
       "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -57,13 +64,6 @@
         }
       ],
       [
-        "expo-maps",
-        {
-          "requestLocationPermission": true,
-          "locationPermission": "Allow $(PRODUCT_NAME) to use your location"
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "cameraPermission": "Allow EcoPick to access your camera to take photos of waste.",
@@ -74,11 +74,15 @@
       "@react-native-community/datetimepicker"
     ],
     "extra": {
-      "EXPO_PUBLIC_API_BASE_URL": "https://ecopick-api.vercel.app",
+      "EXPO_PUBLIC_API_BASE_URL": "https://ecopick-api-iota.vercel.app",
+      "EXPO_PUBLIC_DAKLAK_MAP_URL": "https://ecopick-api-iota.vercel.app",
+      "EXPO_PUBLIC_DAKLAK_MAP_PAGE": "https://ecopick-api-iota.vercel.app/opendesign/mockups/daklak-map/",
+      "EXPO_PUBLIC_OSRM_ROUTER_URL": "https://router.project-osrm.org",
       "router": {},
       "eas": {
-        "projectId": "a736421d-41f1-4841-bcd1-8cb638183132"
+        "projectId": "d04f2e6a-b4f5-4db9-ad5c-1366a421d0ee"
       }
-    }
+    },
+    "owner": "awsc"
   }
 }

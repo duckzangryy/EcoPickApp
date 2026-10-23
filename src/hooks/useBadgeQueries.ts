@@ -7,6 +7,7 @@ import {
 	type CreateBadgePayload,
 } from "@/api/services/badgeService";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuthStore } from "@/stores/authStore";
 
 // ============================================================
 // Badge Queries
@@ -43,6 +44,28 @@ export const useExchangeItems = (filters?: Record<string, unknown>) => {
 	return useQuery({
 		queryKey: queryKeys.badges.exchangeItems.list(filters),
 		queryFn: () => exchangeItemService.getAll(filters),
+	});
+};
+
+export const useRedemptions = () => {
+	return useQuery({
+		queryKey: queryKeys.badges.redemptions.lists(),
+		queryFn: () => exchangeItemService.getRedemptions(),
+	});
+};
+
+export const useRedeemExchangeItem = () => {
+	const queryClient = useQueryClient();
+	const updateUser = useAuthStore((state) => state.updateUser);
+	return useMutation({
+		mutationFn: (itemId: string) => exchangeItemService.redeem(itemId),
+		onSuccess: (result) => {
+			updateUser({ eco_points: result.newTotal });
+			queryClient.invalidateQueries({ queryKey: queryKeys.badges.exchangeItems.lists() });
+			queryClient.invalidateQueries({ queryKey: queryKeys.badges.redemptions.all });
+			queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
+			queryClient.invalidateQueries({ queryKey: queryKeys.chat.pointLogs.all });
+		},
 	});
 };
 

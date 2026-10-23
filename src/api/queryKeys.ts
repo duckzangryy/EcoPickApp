@@ -162,5 +162,9 @@ export const queryKeys = {
       detail: (id: string) =>
         [...queryKeys.badges.exchangeItems.all, 'detail', id] as const,
     },
+    redemptions: {
+      all: ['redemptions'] as const,
+      lists: () => [...queryKeys.badges.redemptions.all, 'list'] as const,
+    },
   },
 } as const;

@@ -1,62 +1,76 @@
-export const Colors = {
-  // Primary brand colors
+const lightColors = {
   primary: '#20693A',
   primaryLight: 'rgba(32, 105, 58, 0.1)',
-  primaryBorder: 'rgba(32, 105, 58, 0.05)',
-
-  // Accent
+  primaryBorder: 'rgba(32, 105, 58, 0.08)',
   accent: '#F97316',
   accentShadow: 'rgba(249, 115, 22, 0.4)',
-
-  // Background
   background: '#F6F8F7',
   white: '#FFFFFF',
   card: '#FFFFFF',
-
-  // Text
   textPrimary: '#0F172A',
   textSecondary: '#64748B',
   textPlaceholder: '#94A3B8',
   textInactive: '#94A3B8',
-
-  // Borders
   border: '#F1F5F9',
   borderMedium: '#E2E8F0',
   divider: '#CBD5E1',
-
-  // Severity - Light (Green)
   severityLightBg: '#DCFCE7',
   severityLightBorder: '#BBF7D0',
   severityLightDot: '#16A34A',
   severityLightText: '#166534',
-
-  // Severity - Medium (Yellow)
   severityMediumBg: '#FEF9C3',
   severityMediumBorder: '#FEF08A',
   severityMediumDot: '#EAB308',
   severityMediumText: '#854D0E',
-
-  // Severity - Heavy (Red)
   severityHeavyBg: '#FEE2E2',
   severityHeavyBorder: '#FECACA',
   severityHeavyDot: '#DC2626',
   severityHeavyText: '#991B1B',
-
-  // Severity - Extreme (Purple)
   severityExtremeBg: '#F3E8FF',
   severityExtremeBorder: '#E9D5FF',
   severityExtremeDot: '#9333EA',
   severityExtremeText: '#6B21A8',
-
-  // Icon backgrounds
   iconRedBg: 'rgba(239, 68, 68, 0.1)',
   iconYellowBg: 'rgba(234, 179, 8, 0.1)',
-
-  // Shadows
   shadowLight: 'rgba(0, 0, 0, 0.1)',
   shadowHeavy: 'rgba(0, 0, 0, 0.25)',
-
-  // Overlay
   overlayWhite: 'rgba(255, 255, 255, 0.9)',
   overlayWhiteStrong: 'rgba(255, 255, 255, 0.95)',
 } as const;
+
+const darkColors = {
+  ...lightColors,
+  primary: '#75D79A',
+  primaryLight: 'rgba(117, 215, 154, 0.14)',
+  primaryBorder: 'rgba(117, 215, 154, 0.16)',
+  background: '#101713',
+  white: '#19231D',
+  card: '#19231D',
+  textPrimary: '#F1F5F2',
+  textSecondary: '#A8B7AD',
+  textPlaceholder: '#84968A',
+  textInactive: '#84968A',
+  border: '#26342B',
+  borderMedium: '#34443A',
+  divider: '#405348',
+  severityLightBg: '#173A27',
+  severityLightBorder: '#245B39',
+  severityLightText: '#A7F3C0',
+  severityMediumBg: '#3B3215',
+  severityMediumBorder: '#635322',
+  severityMediumText: '#FDE68A',
+  severityHeavyBg: '#3D2020',
+  severityHeavyBorder: '#6A3333',
+  severityHeavyText: '#FCA5A5',
+  severityExtremeBg: '#302348',
+  severityExtremeBorder: '#513A77',
+  severityExtremeText: '#D8B4FE',
+  shadowLight: 'rgba(0, 0, 0, 0.28)',
+  shadowHeavy: 'rgba(0, 0, 0, 0.5)',
+  overlayWhite: 'rgba(25, 35, 29, 0.9)',
+  overlayWhiteStrong: 'rgba(25, 35, 29, 0.96)',
+} as const;
+
+export type AppTheme = 'light' | 'dark';
+export const getColors = (theme: AppTheme) => theme === 'dark' ? darkColors : lightColors;
+export const Colors = lightColors;

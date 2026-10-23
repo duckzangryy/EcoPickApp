@@ -17,9 +17,11 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { Colors, Fonts } from '../../../constants';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 import { shareContent } from '../../../utils/share';
 import EventChat from './components/EventChat';
 import EventDetailSkeleton from './components/EventDetailSkeleton';
@@ -32,10 +34,12 @@ import { parseEquipment } from './constants';
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const theme = useThemeStore((s) => s.theme);
+  const colors = getColors(theme);
   const user = useAuthStore((s) => s.user);
-  // console.log('event id: ', id);
-  // console.log('user id: ', user?.id)
+  const updateUser = useAuthStore((s) => s.updateUser);
 
   // API
   const { data: event, isLoading, isError } = useEvent(id!);
@@ -68,8 +72,11 @@ export default function EventDetailScreen() {
             { text: t('common.cancel'), style: 'cancel' },
             {
               text: t('eventDetail.confirm'), onPress: async () => {
-                await leaveMutation.mutateAsync(userParticipant.id);
+                const result = await leaveMutation.mutateAsync(userParticipant.id);
                 setJoined(false);
+                if (typeof result?.newTotal === 'number') {
+                  updateUser({ eco_points: result.newTotal });
+                }
                 Toast.show({
                   type: 'success',
                   text1: t('eventDetail.leaveEvent'),
@@ -92,15 +99,19 @@ export default function EventDetailScreen() {
     }
 
     try {
-      await joinMutation.mutateAsync({
+      const result = await joinMutation.mutateAsync({
         event: id,
         user: user.id,
         status: 'joined',
       });
       setJoined(true);
+      if (typeof result?.newTotal === 'number') {
+        updateUser({ eco_points: result.newTotal });
+      }
       Toast.show({
         type: 'success',
         text1: t('eventDetail.joinEvent'),
+        text2: result?.pointsEarned ? `+${result.pointsEarned} điểm Eco` : undefined,
       });
     } catch (error: any) {
       console.log('Error creating event:', error?.response?.data || error);
@@ -111,28 +122,7 @@ export default function EventDetailScreen() {
           t('eventDetail.joinError'),
       })
     }
-  }, [event, user?.id, joined, userParticipant, joinMutation, leaveMutation, t]);
-
-  // const handleLeaveEvent = useCallback(async () => {
-  //   if (!event || !user?.id) return;
-  //   if (!joined) {
-  //     setJoined(true);
-  //     return;
-  //   }
-
-  //   try {
-  //     await leaveMutation.mutateAsync();
-  //     setJoined(false);
-  //   } catch (error: any) {
-  //     console.log('Error leaving event:', error?.response?.data || error);
-  //     Toast.show({
-  //       type: 'error',
-  //       text1: t('common.error', { defaultValue: 'Error' }),
-  //       text2: error?.response?.data?.detail ||
-  //         t('eventDetail.leaveError', { defaultValue: 'Could not leave event. Please try again.' }),
-  //     })
-  //   }
-  // }, [event, user?.id, joined, leaveMutation, t]);
+  }, [event, user?.id, joined, userParticipant, joinMutation, leaveMutation, t, updateUser]);
 
   const handleOpenMaps = useCallback(() => {
     if (!event) return;
@@ -166,11 +156,11 @@ export default function EventDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={s.safeArea}>
-        <StatusBar style="dark" />
-        <View style={s.header}>
+      <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}>
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
+        <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]} >
           <TouchableOpacity style={s.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={16} color="#0F172A" />
+            <Ionicons name="arrow-back" size={16} color={colors.textPrimary} />
           </TouchableOpacity>
           <View style={s.headerBtn} />
         </View>
@@ -187,18 +177,18 @@ export default function EventDetailScreen() {
 
   if (isError || !event) {
     return (
-      <SafeAreaView style={s.safeArea}>
-        <StatusBar style="dark" />
-        <View style={s.header}>
+      <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}>
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
+        <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]} >
           <TouchableOpacity style={s.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={16} color="#0F172A" />
+            <Ionicons name="arrow-back" size={16} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>{t('common.error', { defaultValue: 'Error' })}</Text>
+          <Text style={[s.headerTitle, { color: colors.textPrimary } ]}>{t('common.error', { defaultValue: 'Error' })}</Text>
           <View style={s.headerBtn} />
         </View>
         <View style={s.loadingContainer}>
           <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
-          <Text style={s.errorText}>
+          <Text style={[s.errorText, { color: colors.textSecondary }]}>
             {t('common.errorLoading', { defaultValue: 'Failed to load event details' })}
           </Text>
           <TouchableOpacity style={s.retryButton} onPress={() => router.back()}>
@@ -215,26 +205,25 @@ export default function EventDetailScreen() {
   const participantCount = participants.filter(
     (p) => p.event === id && p.status === 'joined'
   ).length;
-  // console.log('participant count: ', participantCount)
 
   return (
-    <SafeAreaView style={s.safeArea}>
-      {/* <StatusBar style="dark" /> */}
+    <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
 
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]} >
         <TouchableOpacity style={s.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={16} color="#0F172A" />
+          <Ionicons name="arrow-back" size={16} color={colors.textPrimary} />
         </TouchableOpacity>
         <TouchableOpacity style={s.headerBtn} activeOpacity={0.7} onPress={handleShare}>
-          <Ionicons name="share-social-outline" size={18} color="#0F172A" />
+          <Ionicons name="share-social-outline" size={18} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           style={s.scrollContainer}
-          contentContainerStyle={s.contentContainer}
+          contentContainerStyle={[s.contentContainer, { paddingBottom: 110 + Math.max(insets.bottom, 16) }]}
           showsVerticalScrollIndicator={false}
         >
           <EventHero event={event} onOpenMaps={handleOpenMaps} />
@@ -249,11 +238,11 @@ export default function EventDetailScreen() {
       </KeyboardAvoidingView>
 
       {/* Bottom Join Button */}
-      <View style={[s.bottomBar, { paddingBottom: Platform.OS === 'ios' ? 32 : 24 }]}>
+      <View style={[s.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) + (Platform.OS === 'ios' ? 12 : 8), backgroundColor: colors.card, borderTopColor: colors.border }]}>
         <TouchableOpacity
           style={[
             s.mainJoinButton,
-            joined && s.joinedButton,
+            joined && { backgroundColor: colors.borderMedium },
             isEventEnded && s.disabledButton,
           ]}
           onPress={handleJoinEvent}

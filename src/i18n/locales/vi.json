@@ -88,6 +88,7 @@
 		"notesPlaceholder": "Cung c\u1ea5p th\u00eam ng\u1eef c\u1ea3nh...",
 		"submitReport": "G\u1eecI B\u00c1O C\u00c1O",
 		"takePhotoFirst": "Vui l\u00f2ng ch\u1ee5p \u1ea3nh tr\u01b0\u1edbc!",
+		"locationRequired": "Vui l\u00f2ng ch\u1ecdn v\u1ecb tr\u00ed b\u00e1o c\u00e1o tr\u01b0\u1edbc khi g\u1eedi.",
 		"cameraPermissionRequired": "C\u1ea7n quy\u1ec1n truy c\u1eadp camera",
 		"galleryPermissionRequired": "C\u1ea7n quy\u1ec1n truy c\u1eadp th\u01b0 vi\u1ec7n \u1ea3nh",
 		"plastic": "Nh\u1ef1a",
@@ -111,7 +112,8 @@
 		"title": "Y\u00eau c\u1ea7u quy\u1ec1n",
 		"cameraMessage": "C\u1ea7n quy\u1ec1n camera \u0111\u1ec3 b\u00e1o c\u00e1o v\u1ea5n \u0111\u1ec1. Vui l\u00f2ng b\u1eadt trong c\u00e0i \u0111\u1eb7t thi\u1ebft b\u1ecb.",
 		"goWithoutPhoto": "\u0110i m\u00e0 kh\u00f4ng c\u00f3 \u1ea3nh",
-		"cameraError": "Kh\u00f4ng th\u1ec3 m\u1edf camera"
+		"cameraError": "Kh\u00f4ng th\u1ec3 m\u1edf camera",
+		"galleryError": "Kh\u00f4ng th\u1ec3 m\u1edf th\u01b0 vi\u1ec7n \u1ea3nh"
 	},
 	"events": {
 		"headerTitle": "S\u1ef1 ki\u1ec7n EcoPick",

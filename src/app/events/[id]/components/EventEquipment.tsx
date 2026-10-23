@@ -2,8 +2,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Fonts } from '../../../../constants';
+import { Fonts } from '../../../../constants';
 import { useTranslation } from 'react-i18next';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 
 interface EventEquipmentProps {
   equipmentList: { name: string; status: 'BRING OWN' | 'PROVIDED' }[];
@@ -11,18 +13,19 @@ interface EventEquipmentProps {
 
 export default function EventEquipment({ equipmentList }: EventEquipmentProps) {
   const { t } = useTranslation();
+  const colors = getColors(useThemeStore((state) => state.theme));
 
   if (equipmentList.length === 0) return null;
 
   return (
-    <View style={s.equipmentCard}>
+    <View style={[s.equipmentCard, { backgroundColor: colors.card, borderColor: colors.border } ]}>
       <View style={s.equipmentHeader}>
-        <Ionicons name="cube-outline" size={20} color="#0F172A" />
-        <Text style={s.sectionTitleText}>{t('eventDetail.equipmentNeeded')}</Text>
+        <Ionicons name="cube-outline" size={20} color={colors.textPrimary} />
+        <Text style={[s.sectionTitleText, { color: colors.textPrimary } ]}>{t('eventDetail.equipmentNeeded')}</Text>
       </View>
       <View style={s.equipmentList}>
         {equipmentList.map((item, index) => (
-          <View key={index} style={s.equipmentRow}>
+          <View key={index} style={[s.equipmentRow, { backgroundColor: colors.background } ]}>
             <View style={s.equipmentLeft}>
               <Ionicons
                 name={
@@ -33,9 +36,9 @@ export default function EventEquipment({ equipmentList }: EventEquipmentProps) {
                     : 'hand-left-outline'
                 }
                 size={20}
-                color="#64748B"
+                color={colors.textSecondary}
               />
-              <Text style={s.equipmentName}>{item.name}</Text>
+              <Text style={[s.equipmentName, { color: colors.textPrimary } ]}>{item.name}</Text>
             </View>
             <View
               style={[
@@ -61,26 +64,23 @@ export default function EventEquipment({ equipmentList }: EventEquipmentProps) {
 
 const s = StyleSheet.create({
   equipmentCard: {
-    backgroundColor: Colors.white,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     padding: 17,
     gap: 12,
   },
   equipmentHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionTitleText: { fontFamily: Fonts.bold, fontSize: 16, lineHeight: 24, color: '#0F172A' },
+  sectionTitleText: { fontFamily: Fonts.bold, fontSize: 16, lineHeight: 24 },
   equipmentList: { gap: 8 },
   equipmentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F6F8F7',
     padding: 8,
     borderRadius: 16,
   },
   equipmentLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  equipmentName: { fontFamily: Fonts.regular, fontSize: 14, lineHeight: 20, color: '#0F172A' },
+  equipmentName: { fontFamily: Fonts.regular, fontSize: 14, lineHeight: 20 },
   equipmentStatus: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   equipmentStatusText: { fontFamily: Fonts.bold, fontSize: 10, lineHeight: 15 },
   statusProvided: { backgroundColor: '#DCFCE7' },

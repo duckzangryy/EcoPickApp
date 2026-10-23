@@ -11,8 +11,9 @@ const FieldError = ({ message }: { message?: string }) => {
       <Text style={s.errorText}>{message}</Text>
     </View>
   );
-}
+};
 
+export { FieldError };
 export default FieldError;
 
 const s = StyleSheet.create({

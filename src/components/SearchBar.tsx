@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
     shadowRadius: 15,
-    elevation: 8,
+    elevation: 0,
   },
   inner: {
     flexDirection: 'row',
@@ -77,6 +77,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(32, 105, 58, 0.1)',
     overflow: 'hidden',
+    elevation: 8,
   },
   searchIcon: {
     marginLeft: 16,

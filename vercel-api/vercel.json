@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "functions": {
+    "api/index.js": { "maxDuration": 10 }
+  },
+  "rewrites": [
+    { "source": "/opendesign/mockups/daklak-map", "destination": "/opendesign/mockups/daklak-map/index.html" },
+    { "source": "/opendesign/mockups/daklak-map/", "destination": "/opendesign/mockups/daklak-map/index.html" },
+    { "source": "/api/v1/notifications/unread-count", "destination": "/api?route=/api/v1/notifications/unread-count" },
+    { "source": "/api/v1/notifications/read-all", "destination": "/api?route=/api/v1/notifications/read-all" },
+    { "source": "/api/v1/feed/discover", "destination": "/api?route=/api/v1/feed/discover" },
+    { "source": "/api/v1/reports/nearby", "destination": "/api?route=/api/v1/reports/nearby" },
+    { "source": "/api/v1/events/nearby", "destination": "/api?route=/api/v1/events/nearby" },
+    { "source": "/api/v1/events/:id/join", "destination": "/api?route=/api/v1/events/:id/join" },
+    { "source": "/api/v1/events/:id/check-in", "destination": "/api?route=/api/v1/events/:id/check-in" },
+    { "source": "/api/v1/reports/:id/upvote", "destination": "/api?route=/api/v1/reports/:id/upvote" },
+    { "source": "/api/v1/reports/:id/claim", "destination": "/api?route=/api/v1/reports/:id/claim" },
+    { "source": "/api/v1/reports/:id/status", "destination": "/api?route=/api/v1/reports/:id/status" },
+    { "source": "/api/:path*/", "destination": "/api?route=/api/:path*/" },
+    { "source": "/api/:path*", "destination": "/api?route=/api/:path*" },
+    { "source": "/health/", "destination": "/api?route=/health" },
+    { "source": "/health", "destination": "/api?route=/health" }
+  ]
+}

@@ -4,12 +4,13 @@ import { useFonts } from 'expo-font';
 import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
 import React, { useCallback, useEffect } from 'react';
 import { I18nextProvider, useTranslation } from 'react-i18next';
-import { ActivityIndicator, StatusBar, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Appearance, StatusBar, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Toast from 'react-native-toast-message';
 import { toastConfig } from '../components/ToastConfig';
-import { Colors } from '../constants/Colors';
+import { Colors, getColors } from '../constants/Colors';
 import i18n, { loadSavedLanguage } from '../i18n';
+import { useThemeStore } from '../stores/themeStore';
 import { queryClient } from '../lib/queryClient';
 import { useAuthStore } from '../stores/authStore';
 
@@ -34,7 +35,6 @@ function NavigationGuard() {
       segments.length < 1;
 
     if (!isAuthenticated && !inAuthGroup && !inPublicGroup) {
-      // console.log('===sign out...');
       router.replace('/auth/login');
       Toast.show({
         type: 'success',
@@ -43,7 +43,6 @@ function NavigationGuard() {
       });
     }
     if (isAuthenticated && inAuthGroup) {
-      // console.log('===sign in...');
       router.replace('/(tabs)/map');
       Toast.show({
         type: 'success',
@@ -64,10 +63,21 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+  const theme = useThemeStore((s) => s.theme);
+  const colors = getColors(theme);
+  const [themeLoaded, setThemeLoaded] = React.useState(false);
 
   useEffect(() => {
     loadSavedLanguage();
+    useAuthStore.getState().loadStoredAuth();
+    void useThemeStore.getState().loadTheme().finally(() => setThemeLoaded(true));
   }, []);
+
+  // Theme là lựa chọn thủ công trong app, không theo OS. Ép native components
+  // (Alert, DateTimePicker, keyboard, system dialogs) khớp với theme đang bật.
+  useEffect(() => {
+    Appearance.setColorScheme?.(theme);
+  }, [theme]);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
@@ -75,10 +85,10 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) {
+  if ((!fontsLoaded && !fontError) || !themeLoaded) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={styles.loading}>
+        <View style={[styles.loading, { backgroundColor: colors.background }]}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       </GestureHandlerRootView>
@@ -87,12 +97,12 @@ export default function RootLayout() {
 
   return (
     <>
-      <StatusBar barStyle={'dark-content'} backgroundColor={Colors.border} />
+      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
           <I18nextProvider i18n={i18n}>
-            <View style={styles.container} onLayout={onLayoutRootView}>
-              <Stack screenOptions={{ headerShown: false }} initialRouteName="index">
+            <View style={[styles.container, { backgroundColor: colors.background }]} onLayout={onLayoutRootView}>
+              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} initialRouteName="index">
                 <Stack.Screen name="index" options={{ headerShown: false, animation: 'none' }} />
                 <Stack.Screen name="splash" options={{ headerShown: false, animation: 'none' }} />
                 <Stack.Screen name="onboarding" options={{ headerShown: false, animation: 'fade' }} />
@@ -111,7 +121,6 @@ export default function RootLayout() {
           </I18nextProvider>
         </QueryClientProvider>
       </GestureHandlerRootView>
-      <StatusBar barStyle={'dark-content'} />
       <Toast config={toastConfig} topOffset={60} visibilityTime={3000} />
     </>
   );
@@ -120,12 +129,10 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   loading: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
   },
 });

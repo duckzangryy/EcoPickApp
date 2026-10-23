@@ -53,26 +53,47 @@ export interface CreateLikePayload {
 }
 
 // ============================================================
+// Helper: normalize API response sang array hoặc object
+// ============================================================
+function extractArray<T>(raw: any, keys: string[] = []): T[] {
+  if (Array.isArray(raw)) return raw as T[];
+  const inner = raw?.data ?? raw;
+  if (Array.isArray(inner)) return inner as T[];
+  for (const k of keys) {
+    if (inner && Array.isArray(inner[k])) return inner[k] as T[];
+  }
+  return [] as T[];
+}
+
+function extractObject<T>(raw: any): T {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const inner = raw?.data ?? raw;
+    return inner as T;
+  }
+  return raw as T;
+}
+
+// ============================================================
 // API Functions
 // ============================================================
 
 export const postService = {
   /** GET /api/post/posts/ */
-  getAll: async (params?: Record<string, unknown>) => {
-    const { data } = await api.get<Post[]>(ENDPOINTS.POSTS.LIST, { params });
-    return data;
+  getAll: async (params?: Record<string, unknown>): Promise<Post[]> => {
+    const { data } = await api.get(ENDPOINTS.POSTS.LIST, { params });
+    return extractArray<Post>(data, ['posts', 'results']);
   },
 
   /** GET /api/post/posts/{id}/ */
-  getById: async (id: string) => {
-    const { data } = await api.get<Post>(ENDPOINTS.POSTS.BY_ID(id));
-    return data;
+  getById: async (id: string): Promise<Post> => {
+    const { data } = await api.get(ENDPOINTS.POSTS.BY_ID(id));
+    return extractObject<Post>(data);
   },
 
   /** POST /api/post/posts/ */
-  create: async (payload: CreatePostPayload) => {
-    const { data } = await api.post<Post>(ENDPOINTS.POSTS.LIST, payload);
-    return data;
+  create: async (payload: CreatePostPayload): Promise<Post> => {
+    const { data } = await api.post(ENDPOINTS.POSTS.LIST, payload);
+    return extractObject<Post>(data);
   },
 
   /** DELETE /api/post/posts/{id}/ */
@@ -82,23 +103,23 @@ export const postService = {
   },
 
   /** PATCH /api/post/posts/{id}/ */
-  update: async (id: string, payload: Partial<Post>) => {
-    const { data } = await api.patch<Post>(ENDPOINTS.POSTS.BY_ID(id), payload);
-    return data;
+  update: async (id: string, payload: Partial<Post>): Promise<Post> => {
+    const { data } = await api.patch(ENDPOINTS.POSTS.BY_ID(id), payload);
+    return extractObject<Post>(data);
   },
 };
 
 export const commentService = {
   /** GET /api/post/comments/ */
-  getAll: async (params?: Record<string, unknown>) => {
-    const { data } = await api.get<PostComment[]>(ENDPOINTS.POSTS.COMMENTS.LIST, { params });
-    return data;
+  getAll: async (params?: Record<string, unknown>): Promise<PostComment[]> => {
+    const { data } = await api.get(ENDPOINTS.POSTS.COMMENTS.LIST, { params });
+    return extractArray<PostComment>(data, ['comments', 'results']);
   },
 
   /** POST /api/post/comments/ */
-  create: async (payload: CreateCommentPayload) => {
-    const { data } = await api.post<PostComment>(ENDPOINTS.POSTS.COMMENTS.LIST, payload);
-    return data;
+  create: async (payload: CreateCommentPayload): Promise<PostComment> => {
+    const { data } = await api.post(ENDPOINTS.POSTS.COMMENTS.LIST, payload);
+    return extractObject<PostComment>(data);
   },
 
   /** DELETE /api/post/comments/{id}/ */
@@ -110,15 +131,15 @@ export const commentService = {
 
 export const likeService = {
   /** GET /api/post/likes/ */
-  getAll: async (params?: Record<string, unknown>) => {
-    const { data } = await api.get<PostLike[]>(ENDPOINTS.POSTS.LIKES.LIST, { params });
-    return data;
+  getAll: async (params?: Record<string, unknown>): Promise<PostLike[]> => {
+    const { data } = await api.get(ENDPOINTS.POSTS.LIKES.LIST, { params });
+    return extractArray<PostLike>(data, ['likes', 'results']);
   },
 
   /** POST /api/post/likes/ */
-  create: async (payload: CreateLikePayload) => {
-    const { data } = await api.post<PostLike>(ENDPOINTS.POSTS.LIKES.LIST, payload);
-    return data;
+  create: async (payload: CreateLikePayload): Promise<PostLike> => {
+    const { data } = await api.post(ENDPOINTS.POSTS.LIKES.LIST, payload);
+    return extractObject<PostLike>(data);
   },
 
   /** DELETE /api/post/likes/{id}/ */

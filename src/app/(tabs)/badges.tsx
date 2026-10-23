@@ -1,12 +1,15 @@
-import { useBadges, useUserBadges } from '@/hooks/useBadgeQueries';
+import { useBadges, useExchangeItems, useRedeemExchangeItem, useUserBadges } from '@/hooks/useBadgeQueries';
+import { useUserInfo } from '@/hooks/useUserQueries';
 import { useAuthStore } from '@/stores/authStore';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Alert,
   DeviceEventEmitter,
+  Modal,
   Image,
   Platform,
   RefreshControl,
@@ -18,6 +21,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BorderRadius, Colors, FontSizes, Fonts, LineHeights, Spacing } from '../../constants';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 
 // ─── Category key → i18n key mapping ──────────────────────────────────────────
 const CATEGORY_ICON: Record<string, string> = {
@@ -36,11 +42,13 @@ const CATEGORY_COLOR: Record<string, { color: string; bg: string }> = {
   default: { color: '#D97706', bg: 'rgba(217,119,6,0.1)' },
 };
 
-function getCategoryStyle(category: string) {
+function getCategoryStyle(category?: string) {
+  if (!category) return CATEGORY_COLOR.default;
   return CATEGORY_COLOR[category] ?? CATEGORY_COLOR.default;
 }
 
-function getCategoryIcon(category: string): string {
+function getCategoryIcon(category?: string): string {
+  if (!category) return CATEGORY_ICON.default;
   return CATEGORY_ICON[category] ?? CATEGORY_ICON.default;
 }
 
@@ -49,9 +57,9 @@ interface BadgeCardProps {
   badge: {
     id: string;
     name: string;
-    description: string;
+    description?: string;
     icon_url: string;
-    category: string;
+    category?: string;
   };
   earned: boolean;
   categoryLabel: string;
@@ -59,12 +67,13 @@ interface BadgeCardProps {
 }
 
 function BadgeCard({ badge, earned, categoryLabel, onPress }: BadgeCardProps) {
+  const colors = getColors(useThemeStore((s) => s.theme));
   const style = getCategoryStyle(badge.category);
   const icon = getCategoryIcon(badge.category);
 
   return (
     <TouchableOpacity
-      style={[styles.badgeCard, !earned && styles.badgeCardLocked]}
+      style={[styles.badgeCard, { backgroundColor: colors.card, borderColor: colors.border }, !earned && { backgroundColor: colors.card }]}
       onPress={onPress}
       activeOpacity={0.75}
     >
@@ -93,7 +102,7 @@ function BadgeCard({ badge, earned, categoryLabel, onPress }: BadgeCardProps) {
       {/* Info */}
       <View style={styles.badgeInfo}>
         <View style={styles.badgeTopRow}>
-          <Text style={[styles.badgeName, !earned && styles.badgeNameLocked]} numberOfLines={1}>
+          <Text style={[styles.badgeName, { color: colors.textPrimary }]} numberOfLines={1}>
             {badge.name}
           </Text>
           <View style={[styles.categoryPill, { backgroundColor: earned ? style.bg : 'rgba(148,163,184,0.08)' }]}>
@@ -102,12 +111,12 @@ function BadgeCard({ badge, earned, categoryLabel, onPress }: BadgeCardProps) {
             </Text>
           </View>
         </View>
-        <Text style={styles.badgeDesc} numberOfLines={2}>
+        <Text style={[styles.badgeDesc, { color: colors.textSecondary }]} numberOfLines={2}>
           {badge.description}
         </Text>
       </View>
 
-      <Ionicons name="chevron-forward" size={16} color={earned ? '#CBD5E1' : '#E2E8F0'} />
+      <Ionicons name="chevron-forward" size={16} color={colors.textPlaceholder} />
     </TouchableOpacity >
   );
 }
@@ -128,8 +137,29 @@ function BadgeSkeleton() {
 export default function BadgesScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const userId = useAuthStore((s) => s.user?.id);
+  const theme = useThemeStore((s) => s.theme);
+  const colors = getColors(theme);
+  const storeUser = useAuthStore((s) => s.user);
+  const { data: apiUser, refetch: refetchUser } = useUserInfo();
+  useFocusEffect(React.useCallback(() => { void refetchUser(); }, [refetchUser]));
+  const user = apiUser ?? storeUser;
+  const userId = user?.id;
   const scrollRef = React.useRef<ScrollView>(null);
+  const { data: rewards = [], refetch: refetchRewards } = useExchangeItems();
+  const redeemMutation = useRedeemExchangeItem();
+  const [confirmReward, setConfirmReward] = React.useState<{ id: string; title: string; points_cost: number } | null>(null);
+  const [successRedemption, setSuccessRedemption] = React.useState<import('@/api/services/badgeService').Redemption | null>(null);
+
+  const redeemReward = async (id: string) => {
+    try {
+      const result = await redeemMutation.mutateAsync(id);
+      setSuccessRedemption(result.redemption);
+    } catch (error: any) {
+      const message = error?.response?.data?.error?.message || error?.response?.data?.detail || error?.message || 'Vui lòng thử lại.';
+      if (Platform.OS === 'web') window.alert(`Chưa đổi được quà: ${message}`);
+      else Alert.alert('Chưa đổi được quà', message);
+    }
+  };
 
   const {
     data: allBadges = [],
@@ -141,7 +171,6 @@ export default function BadgesScreen() {
   const { data: userBadges = [], isLoading: loadingUserBadges } = useUserBadges(
     userId ? { user_id: userId } : undefined,
   );
-  // console.log('userBadges', userBadges);
 
   const earnedBadgeIds = useMemo(
     () => new Set(userBadges.map((ub) => ub.badge_id)),
@@ -161,8 +190,8 @@ export default function BadgesScreen() {
   const isLoading = loadingBadges || loadingUserBadges;
 
   // Helper: get category label via i18n
-  const getCategoryLabel = (category: string): string => {
-    const key = Object.keys(CATEGORY_COLOR).includes(category) ? category : 'default';
+  const getCategoryLabel = (category?: string): string => {
+    const key = category && Object.keys(CATEGORY_COLOR).includes(category) ? category : 'default';
     return t(`badges.category.${key}` as any);
   };
 
@@ -174,19 +203,61 @@ export default function BadgesScreen() {
     return () => sub.remove();
   }, []);
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
 
       {/* ─── Header ─── */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('badges.title')}</Text>
-        <View style={styles.headerBadgeCount}>
-          <Ionicons name="trophy" size={14} color={Colors.primary} />
-          <Text style={styles.headerBadgeCountText}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('badges.title')}</Text>
+        <View style={[styles.headerBadgeCount, { backgroundColor: colors.primaryLight } ]}>
+          <Ionicons name="trophy" size={14} color={colors.primary} />
+          <Text style={[styles.headerBadgeCountText, { color: colors.primary } ]}>
             {t('badges.headerCount', { earned: earnedCount, total: totalCount })}
           </Text>
         </View>
       </View>
+
+      <Modal visible={!!confirmReward} transparent animationType="fade" onRequestClose={() => setConfirmReward(null)}>
+        <View style={styles.successOverlay}>
+          <View style={[styles.successCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.successTitle, { color: colors.textPrimary } ]}>Xác nhận đổi quà</Text>
+            <Text style={[styles.rewardName, { color: colors.textPrimary }]}>{confirmReward?.title}</Text>
+            <Text style={[styles.rewardSponsor, { color: colors.textSecondary }]}>Dùng {confirmReward?.points_cost} điểm Eco</Text>
+            <TouchableOpacity
+              style={styles.successButton}
+              disabled={redeemMutation.isPending}
+              onPress={() => {
+                if (confirmReward) void redeemReward(confirmReward.id);
+                setConfirmReward(null);
+              }}
+            >
+              <Text style={styles.redeemButtonText}>{redeemMutation.isPending ? 'Đang đổi…' : 'Xác nhận đổi'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setConfirmReward(null)}>
+              <Text style={styles.successHistoryLink}>Để sau</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!successRedemption} transparent animationType="fade" onRequestClose={() => setSuccessRedemption(null)}>
+        <View style={styles.successOverlay}>
+          <View style={[styles.successCard, { backgroundColor: colors.card }]}>
+            <View style={styles.successIcon}><Ionicons name="checkmark" size={30} color="#FFFFFF" /></View>
+            <Text style={[styles.successTitle, { color: colors.textPrimary } ]}>Đổi quà thành công!</Text>
+            <Text style={[styles.rewardName, { color: colors.textPrimary }]}>{successRedemption?.item_title}</Text>
+            <Text style={[styles.rewardSponsor, { color: colors.textSecondary }]}>Đã trừ {successRedemption?.points_spent} điểm{successRedemption?.sponsor ? ` · ${successRedemption.sponsor}` : ''}</Text>
+            <Text style={styles.successCodeLabel}>Mã nhận quà</Text>
+            <Text selectable style={styles.successCode}>{successRedemption?.code}</Text>
+            <TouchableOpacity style={styles.successButton} onPress={() => setSuccessRedemption(null)}>
+              <Text style={styles.redeemButtonText}>Đã hiểu</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setSuccessRedemption(null); router.push('/redemptions' as any); }}>
+              <Text style={styles.successHistoryLink}>Xem phần thưởng đã đổi</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <ScrollView
         ref={scrollRef}
@@ -195,30 +266,30 @@ export default function BadgesScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
-            onRefresh={refetchBadges}
-            tintColor={Colors.primary}
-            colors={[Colors.primary]}
+            onRefresh={() => { refetchBadges(); refetchRewards(); }}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
         {/* ─── Progress Banner ─── */}
-        <View style={styles.progressBanner}>
+        <View style={[styles.progressBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.progressHeader}>
             <View>
-              <Text style={styles.progressTitle}>{t('badges.progressTitle')}</Text>
-              <Text style={styles.progressSub}>
+              <Text style={[styles.progressTitle, { color: colors.textPrimary }]}>{t('badges.progressTitle')}</Text>
+              <Text style={[styles.progressSub, { color: colors.textSecondary }]}>
                 {t('badges.progressSub', { count: earnedCount })}
               </Text>
             </View>
-            <View style={styles.progressCircle}>
-              <Text style={styles.progressPercent}>
+            <View style={[styles.progressCircle, { backgroundColor: colors.primaryLight, borderColor: colors.primaryBorder } ]}>
+              <Text style={[styles.progressPercent, { color: colors.primary }]}>
                 {totalCount > 0 ? Math.round(progress * 100) : 0}%
               </Text>
             </View>
           </View>
 
-          <View style={styles.progressBarTrack}>
-            <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+          <View style={[styles.progressBarTrack, { backgroundColor: colors.primaryBorder }]}>
+            <View style={[styles.progressBarFill, { width: `${progress * 100}%`, backgroundColor: colors.primary }]} />
           </View>
 
           <View style={styles.progressStats}>
@@ -237,6 +308,37 @@ export default function BadgesScreen() {
           </View>
         </View>
 
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="gift" size={17} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Đổi quà từ nhà tài trợ</Text>
+            <Text style={styles.balanceText}>{user?.eco_points || 0} điểm</Text>
+          </View>
+          {rewards.map((reward) => {
+            const affordable = (user?.eco_points || 0) >= reward.points_cost;
+            const inStock = reward.available_quantity === undefined || reward.available_quantity > 0;
+            return (
+              <Reanimated.View key={reward.id} entering={FadeInDown.duration(260)} style={[styles.rewardCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {reward.image_url ? <Image source={{ uri: reward.image_url }} style={styles.rewardImage} /> : <View style={styles.rewardImageFallback}><Ionicons name="gift-outline" size={28} color={Colors.primary} /></View>}
+                <View style={styles.rewardInfo}>
+                  <Text style={[styles.rewardName, { color: colors.textPrimary }]}>{reward.title}</Text>
+                  {!!reward.sponsor && <Text style={[styles.rewardSponsor, { color: colors.textSecondary }]}>Tài trợ bởi {reward.sponsor}</Text>}
+                  {!!reward.description && <Text style={[styles.rewardDesc, { color: colors.textSecondary }]} numberOfLines={2}>{reward.description}</Text>}
+                  <Text style={[styles.rewardCost, { color: theme === 'dark' ? '#FBBF24' : '#B45309' } ]}>{reward.points_cost} điểm{reward.available_quantity !== undefined ? ` · Còn ${reward.available_quantity}` : ''}</Text>
+                  <TouchableOpacity
+                    style={[styles.redeemButton, (!affordable || !inStock || redeemMutation.isPending) && styles.redeemButtonDisabled]}
+                    disabled={!affordable || !inStock || redeemMutation.isPending}
+                    onPress={() => setConfirmReward({ id: reward.id, title: reward.title, points_cost: reward.points_cost })}
+                  >
+                    <Text style={styles.redeemButtonText}>{!inStock ? 'Hết quà' : affordable ? 'Đổi quà' : 'Chưa đủ điểm'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </Reanimated.View>
+            );
+          })}
+          {rewards.length === 0 && <Text style={[styles.rewardDesc, { color: colors.textSecondary }]}>Chưa có quà tặng. Hãy quay lại sau.</Text>}
+        </View>
+
         {/* ─── Badge List ─── */}
         {isLoading ? (
           <View style={styles.sectionBlock}>
@@ -245,10 +347,10 @@ export default function BadgesScreen() {
             ))}
           </View>
         ) : allBadges.length === 0 ? (
-          <View style={styles.emptyState}>
+          <View style={[styles.emptyState, { backgroundColor: colors.background } ]}>
             <Ionicons name="trophy-outline" size={56} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>{t('badges.emptyTitle')}</Text>
-            <Text style={styles.emptyDesc}>{t('badges.emptyDesc')}</Text>
+            <Text style={[styles.emptyTitle, { color: colors.textSecondary } ]}>{t('badges.emptyTitle')}</Text>
+            <Text style={[styles.emptyDesc, { color: colors.textPlaceholder } ]}>{t('badges.emptyDesc')}</Text>
           </View>
         ) : (
           <>
@@ -256,10 +358,10 @@ export default function BadgesScreen() {
             {sortedBadges.earned.length > 0 && (
               <View style={styles.sectionBlock}>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
-                  <Text style={styles.sectionTitle}>{t('badges.earnedSection')}</Text>
-                  <View style={styles.sectionCountPill}>
-                    <Text style={styles.sectionCountText}>{sortedBadges.earned.length}</Text>
+                  <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                  <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('badges.earnedSection')}</Text>
+                  <View style={[styles.sectionCountPill, { backgroundColor: colors.primaryLight } ]}>
+                    <Text style={[styles.sectionCountText, { color: colors.primary } ]}>{sortedBadges.earned.length}</Text>
                   </View>
                 </View>
                 {sortedBadges.earned.map((badge) => (
@@ -279,11 +381,11 @@ export default function BadgesScreen() {
               <View style={styles.sectionBlock}>
                 <View style={styles.sectionHeader}>
                   <Ionicons name="lock-closed" size={16} color="#565e69" />
-                  <Text style={[styles.sectionTitle, { color: '#565e69' }]}>
+                  <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                     {t('badges.lockedSection')}
                   </Text>
                   <View style={[styles.sectionCountPill, { backgroundColor: 'rgba(148,163,184,0.12)' }]}>
-                    <Text style={[styles.sectionCountText, { color: '#565e69' }]}>
+                    <Text style={[styles.sectionCountText, { color: colors.textSecondary }]}>
                       {sortedBadges.locked.length}
                     </Text>
                   </View>
@@ -451,6 +553,26 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     color: Colors.primary,
   },
+  balanceText: { fontFamily: Fonts.semiBold, fontSize: FontSizes.sm, color: Colors.primary },
+  successOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  successCard: { width: '100%', maxWidth: 380, backgroundColor: Colors.white, borderRadius: 24, padding: 24, alignItems: 'center', gap: 10 },
+  successIcon: { width: 58, height: 58, borderRadius: 29, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  successTitle: { fontFamily: Fonts.bold, fontSize: FontSizes.xl, color: Colors.textPrimary },
+  successCodeLabel: { fontFamily: Fonts.medium, fontSize: FontSizes.sm, color: Colors.textSecondary, marginTop: 8 },
+  successCode: { fontFamily: Fonts.bold, fontSize: FontSizes.lg, color: Colors.primary, letterSpacing: 1.5 },
+  successButton: { alignSelf: 'stretch', alignItems: 'center', backgroundColor: Colors.primary, paddingVertical: 13, borderRadius: BorderRadius.full, marginTop: 10 },
+  successHistoryLink: { fontFamily: Fonts.semiBold, fontSize: FontSizes.sm, color: Colors.primary, paddingTop: 4 },
+  rewardCard: { flexDirection: 'row', backgroundColor: Colors.white, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.primaryBorder, padding: Spacing.md, gap: Spacing.md },
+  rewardImage: { width: 88, height: 88, borderRadius: BorderRadius.md, backgroundColor: '#F1F5F9' },
+  rewardImageFallback: { width: 88, height: 88, borderRadius: BorderRadius.md, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  rewardInfo: { flex: 1, gap: 4 },
+  rewardName: { fontFamily: Fonts.semiBold, fontSize: FontSizes.md, color: Colors.textPrimary },
+  rewardSponsor: { fontFamily: Fonts.medium, fontSize: FontSizes.xs, color: Colors.primary },
+  rewardDesc: { fontFamily: Fonts.regular, fontSize: FontSizes.sm, color: Colors.textSecondary },
+  rewardCost: { fontFamily: Fonts.bold, fontSize: FontSizes.sm, color: '#B45309' },
+  redeemButton: { alignSelf: 'flex-start', backgroundColor: Colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: BorderRadius.full, marginTop: 4 },
+  redeemButtonDisabled: { backgroundColor: '#94A3B8' },
+  redeemButtonText: { fontFamily: Fonts.semiBold, fontSize: FontSizes.sm, color: Colors.white },
   badgeCard: {
     flexDirection: 'row',
     alignItems: 'center',

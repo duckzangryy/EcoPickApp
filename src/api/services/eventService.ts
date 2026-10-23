@@ -50,8 +50,7 @@ export interface CreateEventPayload {
 
 export interface EventParticipant {
 	id: string;
-	status: string; // "joined"
-	joined_at: string;
+	status: string; // "joined"	joined_at: string;
 	checked_in_at: string;
 	event: string;
 	user: string;
@@ -76,28 +75,48 @@ export interface TourStop {
 }
 
 // ============================================================
+// Helper: normalize API response sang array hoặc object
+// ============================================================
+function extractArray<T>(raw: any, keys: string[]): T[] {
+	if (Array.isArray(raw)) return raw as T[];
+	const inner = raw?.data ?? raw;
+	for (const k of keys) {
+		if (Array.isArray(inner?.[k])) return inner[k] as T[];
+	}
+	if (Array.isArray(inner)) return inner as T[];
+	return [];
+}
+
+function extractObject<T>(raw: any): T {
+	if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+		// { success, data: {...} }
+		const inner = raw?.data ?? raw;
+		return inner as T;
+	}
+	return raw as T;
+}
+
+// ============================================================
 // API Functions
 // ============================================================
 
 export const eventService = {
 	/** Lấy danh sách events – GET /api/event/events/ */
-	getAll: async (params?: Record<string, unknown>) => {
-		const { data } = await api.get<Event[]>(ENDPOINTS.EVENTS.LIST, { params });
-		return data;
+	getAll: async (params?: Record<string, unknown>): Promise<Event[]> => {
+		const { data } = await api.get(ENDPOINTS.EVENTS.LIST, { params });
+		return extractArray<Event>(data, ['events', 'results']);
 	},
 
 	/** Lấy chi tiết event – GET /api/event/events/{id}/ */
-	getById: async (id: string) => {
-		const { data } = await api.get<Event>(ENDPOINTS.EVENTS.BY_ID(id));
-		return data;
+	getById: async (id: string): Promise<Event> => {
+		const { data } = await api.get(ENDPOINTS.EVENTS.BY_ID(id));
+		return extractObject<Event>(data);
 	},
 
 	/** Tạo event – POST /api/event/events/ (formdata) */
-	create: async (payload: CreateEventPayload) => {
-		const { data } = await api.post<Event>(ENDPOINTS.EVENTS.LIST, payload, {
-			headers: { "Content-Type": "multipart/form-data" },
-		});
-		return data;
+	create: async (payload: CreateEventPayload): Promise<Event> => {
+		const { data } = await api.post(ENDPOINTS.EVENTS.LIST, payload);
+		return extractObject<Event>(data);
 	},
 
 	/** Xóa event – DELETE /api/event/events/{id}/ */
@@ -109,27 +128,25 @@ export const eventService = {
 
 export const eventParticipantService = {
 	/** Lấy danh sách participants – GET /api/event/event-participants/ */
-	getAll: async (params?: Record<string, unknown>) => {
-		const { data } = await api.get<EventParticipant[]>(ENDPOINTS.EVENTS.PARTICIPANTS.LIST, { params });
-		return data;
+	getAll: async (params?: Record<string, unknown>): Promise<EventParticipant[]> => {
+		const { data } = await api.get(ENDPOINTS.EVENTS.PARTICIPANTS.LIST, { params });
+		return extractArray<EventParticipant>(data, ['participants', 'results']);
 	},
 
 	/** Tham gia event – POST /api/event/event-participants/ (formdata) */
-	join: async (payload: JoinEventPayload) => {
+	join: async (payload: JoinEventPayload): Promise<EventParticipant & { pointsEarned?: number; newTotal?: number }> => {
 		const formData = new FormData();
 		formData.append("event", payload.event);
 		formData.append("user", payload.user);
 		if (payload.checked_in_at) formData.append("checked_in_at", payload.checked_in_at);
-		const { data } = await api.post<EventParticipant>(ENDPOINTS.EVENTS.PARTICIPANTS.LIST, formData, {
-			headers: { "Content-Type": "multipart/form-data" },
-		});
-		return data;
+		const { data } = await api.post(ENDPOINTS.EVENTS.PARTICIPANTS.LIST, formData);
+		return extractObject<EventParticipant & { pointsEarned?: number; newTotal?: number }>(data);
 	},
 
 	/** Lấy chi tiết participant – GET /api/event/event-participants/{id}/ */
-	getById: async (event_id: string) => {
-		const { data } = await api.get<EventParticipant>(ENDPOINTS.EVENTS.PARTICIPANTS.BY_ID(event_id));
-		return data;
+	getById: async (event_id: string): Promise<EventParticipant> => {
+		const { data } = await api.get(ENDPOINTS.EVENTS.PARTICIPANTS.BY_ID(event_id));
+		return extractObject<EventParticipant>(data);
 	},
 
 	/** Hủy tham gia event – DELETE /api/event/event-participants/{id}/ */
@@ -141,8 +158,8 @@ export const eventParticipantService = {
 
 export const tourStopService = {
 	/** Lấy danh sách tour stops – GET /api/event/tour-stops/ */
-	getAll: async (params?: Record<string, unknown>) => {
-		const { data } = await api.get<TourStop[]>(ENDPOINTS.EVENTS.TOUR_STOPS.LIST, { params });
-		return data;
+	getAll: async (params?: Record<string, unknown>): Promise<TourStop[]> => {
+		const { data } = await api.get(ENDPOINTS.EVENTS.TOUR_STOPS.LIST, { params });
+		return extractArray<TourStop>(data, ['tour_stops', 'results']);
 	},
 };

@@ -44,7 +44,7 @@ export const useCreateReport = () => {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.reports.lists() });
 		},
-		onError: (error) => {
+		onError: (error: any) => {
 			const errorMsg =
 				error?.response?.data?.detail || error?.response?.data?.error || error?.message || "Failed to create report";
 			console.error(errorMsg);

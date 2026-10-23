@@ -1,9 +1,8 @@
 import { useAuthStore } from "@/stores/authStore";
 import axios from "axios";
-import Constants from "expo-constants";
+import { ENV } from "@/config/env";
 
-export const API_BASE_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL;
-// console.log("API Base URL:", API_BASE_URL);
+export const API_BASE_URL = ENV.API_BASE_URL;
 
 const api = axios.create({
 	baseURL: API_BASE_URL,
@@ -43,7 +42,7 @@ api.interceptors.response.use(
 			switch (status) {
 				case 401:
 					// Token hết hạn hoặc không hợp lệ -> logout
-					useAuthStore.getState().logout();
+					if (useAuthStore.getState().token && !useAuthStore.getState().token?.startsWith('mock_')) if (!/\/auth\/(login|register)|\/signin\/?$/.test(error.config?.url || '') && error.config?.headers?.Authorization) useAuthStore.getState().logout();
 					break;
 				case 403:
 					console.warn("[API] Forbidden: Không có quyền truy cập");

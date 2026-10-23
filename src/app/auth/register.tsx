@@ -56,7 +56,14 @@ export default function RegisterScreen() {
   // ─── Submit: đăng ký → tự động đăng nhập ─────────────────
   const onSubmit = (data: RegisterFormData) => {
     signUp.mutate(
-      { email: data.email.trim(), password: data.password },
+      {
+        email: data.email.trim(),
+        password: data.password,
+        fullName: data.fullname?.trim() || data.email.split('@')[0],
+        fullname: data.fullname?.trim() || data.email.split('@')[0],
+        username: data.email.split('@')[0],
+        role: data.role || 'user',
+      },
       {
         onSuccess: () => {
           Toast.show({
@@ -85,6 +92,7 @@ export default function RegisterScreen() {
         },
         onError: (error: any) => {
           const message =
+            error?.response?.data?.error?.message ||
             error?.response?.data?.email?.[0] ||
             error?.response?.data?.detail ||
             error?.response?.data?.error ||

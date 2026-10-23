@@ -45,7 +45,6 @@ export default function LocationDetailScreen() {
 
   const { data: report, isLoading, isError } = useReport(id as string);
   const { user } = useAuthStore();
-  // console.log('Report data:', report);
 
   const severity: SeverityLevel = API_SEVERITY_TO_UI[report?.severity || 'low'] || 'light';
   const severityTheme = getSeverityTheme(severity);

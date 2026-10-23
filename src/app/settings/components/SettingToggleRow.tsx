@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, Switch, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Fonts, FontSizes, LineHeights, BorderRadius, Spacing } from '../../../constants';
+import { Fonts, FontSizes, LineHeights, BorderRadius, Spacing } from '../../../constants';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 
 interface SettingToggleRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -14,20 +16,21 @@ interface SettingToggleRowProps {
 }
 
 export default function SettingToggleRow({ icon, iconColor, iconBg, label, value, onToggle, isLast }: SettingToggleRowProps) {
+  const colors = getColors(useThemeStore((state) => state.theme));
   return (
-    <View style={[styles.settingRow, !isLast && styles.settingRowBorder]}>
+    <View style={[styles.settingRow, !isLast && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
       <View style={styles.settingRowLeft}>
-        <View style={[styles.settingIconBox, { backgroundColor: iconBg || Colors.primaryLight }]}>
-          <Ionicons name={icon} size={16} color={iconColor || Colors.primary} />
+        <View style={[styles.settingIconBox, { backgroundColor: iconBg || colors.primaryLight }]}>
+          <Ionicons name={icon} size={16} color={iconColor || colors.primary} />
         </View>
-        <Text style={styles.settingRowLabel}>{label}</Text>
+        <Text style={[styles.settingRowLabel, { color: colors.textPrimary }]}>{label}</Text>
       </View>
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: '#E2E8F0', true: 'rgba(32,105,58,0.35)' }}
-        thumbColor={value ? Colors.primary : '#F1F5F9'}
-        ios_backgroundColor="#E2E8F0"
+        trackColor={{ false: colors.borderMedium, true: colors.primaryLight }}
+        thumbColor={value ? colors.primary : colors.textPlaceholder}
+        ios_backgroundColor={colors.borderMedium}
       />
     </View>
   );
@@ -44,7 +47,7 @@ const styles = StyleSheet.create({
   },
   settingRowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
+    borderBottomColor: '#F1F5F9',
   },
   settingRowLeft: {
     flexDirection: 'row',
@@ -63,6 +66,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.medium,
     fontSize: FontSizes.md,
     lineHeight: LineHeights.md,
-    color: Colors.textPrimary,
+    color: '#0F172A',
   },
 });

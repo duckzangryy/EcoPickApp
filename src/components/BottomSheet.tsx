@@ -35,10 +35,12 @@ export function ReportsBottomSheet({ reports, totalCount, onNavigateReport, onVi
       ref={sheetRef}
       index={0}
       snapPoints={snapPoints}
+      topInset={insets.top + 12}
       enablePanDownToClose={false}
       enableOverDrag={false}
       animateOnMount={true}
-      style={[styles.sheetZ, { paddingBottom: 200 + insets.bottom }]}
+      containerStyle={styles.sheetContainer}
+      style={styles.sheetZ}
       backgroundStyle={styles.sheetBackground}
       handleIndicatorStyle={styles.handle}
     >
@@ -69,9 +71,11 @@ export function ReportsBottomSheet({ reports, totalCount, onNavigateReport, onVi
 }
 
 const styles = StyleSheet.create({
+  sheetContainer: {
+    pointerEvents: 'box-none',
+  },
   sheetZ: {
     zIndex: 25,
-    elevation: 25,
   },
   sheetBackground: {
     backgroundColor: Colors.white,

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { UserInfo } from '@/api/services/userService';
+import type { UserInfo } from '@/types/user';
 
 // ============================================================
 // Types
@@ -29,7 +29,7 @@ interface AuthState {
 // ============================================================
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  // Initial state
+  // Initial state (mặc định sẵn sàng với LOCAL_USER để không bị treo loading)
   token: null,
   refreshToken: null,
   user: null,
@@ -86,21 +86,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         '@auth_user',
       ]);
 
-      if (token && userJson) {
+      if (token && userJson && !token.startsWith('mock_')) {
         const user = JSON.parse(userJson) as UserInfo;
-        set({
-          token,
-          refreshToken: refreshToken ?? null,
-          user,
-          isAuthenticated: true,
-          isLoading: false,
-        });
+        set({ token, refreshToken: refreshToken ?? null, user, isAuthenticated: true, isLoading: false });
       } else {
-        set({ isLoading: false });
+        await AsyncStorage.multiRemove(['@auth_token', '@auth_refresh_token', '@auth_user']);
+        set({ token: null, refreshToken: null, user: null, isAuthenticated: false, isLoading: false });
       }
     } catch (error) {
       console.error('[AuthStore] Lỗi load auth:', error);
-      set({ isLoading: false });
+      set({ token: null, refreshToken: null, user: null, isAuthenticated: false, isLoading: false });
     }
   },
 

@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import MapView from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -30,15 +30,22 @@ const CUSTOM_MAP_STYLE = [
 ];
 
 const DEFAULT_REGION = {
-  latitude: 10.7769,
-  longitude: 106.7009,
-  latitudeDelta: 0.015,
-  longitudeDelta: 0.015
+  latitude: 12.6828,
+  longitude: 108.0378,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05
 };
 
 export default function PickLocationScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ initialLat?: string; initialLng?: string; returnTo?: string; imageUri?: string }>();
+  const params = useLocalSearchParams<{
+    initialLat?: string;
+    initialLng?: string;
+    returnTo?: string;
+    imageUri?: string;
+    address?: string;
+    locationSource?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
   const { t } = useTranslation();
@@ -55,9 +62,22 @@ export default function PickLocationScreen() {
     return DEFAULT_REGION;
   });
 
-  const [address, setAddress] = useState('');
-  const [addressLine2, setAddressLine2] = useState('');
+  const [address, setAddress] = useState(() => {
+    if (params.address) {
+      const parts = params.address.split(', ');
+      return parts[0] || '';
+    }
+    return '';
+  });
+  const [addressLine2, setAddressLine2] = useState(() => {
+    if (params.address) {
+      const parts = params.address.split(', ');
+      return parts.length > 1 ? parts.slice(1).join(', ') : '';
+    }
+    return '';
+  });
   const [isDetecting, setIsDetecting] = useState(false);
+  const [hasLocationPermission, setHasLocationPermission] = useState(false);
 
   // PIN bounce animation
   const pinBounce = useSharedValue(0);
@@ -100,24 +120,37 @@ export default function PickLocationScreen() {
 
   // On map ready, get user location and center on it (if no initial coords)
   useEffect(() => {
-    if (!params.initialLat && !params.initialLng) {
-      (async () => {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const loc = await Location.getCurrentPositionAsync({});
-          const newRegion = {
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-            latitudeDelta: 0.008,
-            longitudeDelta: 0.008
-          };
-          setRegion(newRegion);
-          mapRef.current?.animateToRegion(newRegion, 800);
-          reverseGeocode(loc.coords.latitude, loc.coords.longitude);
-        }
-      })();
-    } else {
-      reverseGeocode(parseFloat(params.initialLat!), parseFloat(params.initialLng!));
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      const granted = status === 'granted';
+      setHasLocationPermission(granted);
+      if (granted && !params.initialLat && !params.initialLng) {
+        const loc = await Location.getCurrentPositionAsync({});
+        const newRegion = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          latitudeDelta: 0.008,
+          longitudeDelta: 0.008
+        };
+        setRegion(newRegion);
+        mapRef.current?.animateToRegion(newRegion, 800);
+        reverseGeocode(loc.coords.latitude, loc.coords.longitude);
+      }
+    })();
+    if (params.initialLat && params.initialLng) {
+      const lat = parseFloat(params.initialLat);
+      const lng = parseFloat(params.initialLng);
+      const newRegion = {
+        latitude: lat,
+        longitude: lng,
+        latitudeDelta: 0.008,
+        longitudeDelta: 0.008,
+      };
+      setRegion(newRegion);
+      mapRef.current?.animateToRegion(newRegion, 800);
+      if (!params.address) {
+        reverseGeocode(lat, lng);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -158,8 +191,11 @@ export default function PickLocationScreen() {
   }, []);
 
   const handleConfirm = () => {
-    // Build full address string
-    const fullAddress = [address, addressLine2].filter(Boolean).join(', ');
+    // Không lưu câu hướng dẫn "di chuyển bản đồ…" thành địa chỉ — dùng toạ độ thay thế
+    const isPlaceholder = !address || address === t('pickLocation.moveMap');
+    const fullAddress = isPlaceholder
+      ? `${region.latitude.toFixed(6)}, ${region.longitude.toFixed(6)}`
+      : [address, addressLine2].filter(Boolean).join(', ');
     if (params.returnTo === 'report') {
       // Coming from Report screen to edit location
       router.back();
@@ -182,7 +218,7 @@ export default function PickLocationScreen() {
           longitude: String(region.longitude),
           address: fullAddress,
           source: 'library',
-          locationSource: 'custom'
+          locationSource: params.locationSource || 'custom'
         }
       });
     } else if (params.returnTo === 'events/create') {
@@ -218,19 +254,27 @@ export default function PickLocationScreen() {
       
       <MapView
         ref={mapRef}
+        provider={PROVIDER_GOOGLE}
+        mapType="none"
         style={StyleSheet.absoluteFillObject}
         initialRegion={region}
-        showsUserLocation
+        showsUserLocation={hasLocationPermission}
         showsMyLocationButton={false}
         showsCompass={false}
         showsPointsOfInterest={false}
         showsBuildings={false}
         showsIndoors={false}
         showsTraffic={false}
-        customMapStyle={CUSTOM_MAP_STYLE}
         onRegionChange={handleRegionChange}
         onRegionChangeComplete={handleRegionChangeComplete}
-      />
+      >
+        <UrlTile
+          urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+          maximumZ={19}
+          flipY={false}
+          zIndex={1}
+        />
+      </MapView>
       
       <View style={styles.pinContainer} pointerEvents="none">
         <Animated.View style={[styles.pinShadow, animatedShadowStyle]} />
@@ -249,6 +293,21 @@ export default function PickLocationScreen() {
         <Text style={styles.headerTitle}>{t('pickLocation.title')}</Text>
         <View style={styles.headerPlaceholder} />
       </View>
+
+      <TouchableOpacity
+        style={[styles.myLocationBtn, { bottom: 255 }]}
+        onPress={() => {
+          mapRef.current?.animateToRegion({
+            latitude: 12.6828,
+            longitude: 108.0378,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }, 800);
+        }}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="map-outline" size={20} color={Colors.primary} />
+      </TouchableOpacity>
 
       <TouchableOpacity style={[styles.myLocationBtn, { bottom: 200 }]} onPress={handleMyLocation} activeOpacity={0.7}>
         <Ionicons name="locate" size={22} color={Colors.primary} />

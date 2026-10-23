@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { extractGpsFromExif } from '../../utils/exif';
 import {
   ActivityIndicator,
   Dimensions,
@@ -75,6 +77,7 @@ export default function ReportScreen() {
   const [locationLat, setLocationLat] = useState('');
   const [locationLng, setLocationLng] = useState('');
   const [locationCustom, setLocationCustom] = useState(false);
+  const [locationIsExif, setLocationIsExif] = useState(false);
 
   // ─── Animation shared values ───
   const sheetTranslateY = useSharedValue(0);
@@ -94,8 +97,13 @@ export default function ReportScreen() {
     if (params.address) setLocationAddress(params.address);
     if (params.latitude) setLocationLat(params.latitude);
     if (params.longitude) setLocationLng(params.longitude);
-    if (params.locationSource === 'custom') setLocationCustom(true);
-    // console.log('Location params:', params.latitude, params.longitude, params.address, params.locationSource);
+    if (params.locationSource === 'custom') {
+      setLocationCustom(true);
+      setLocationIsExif(false);
+    } else if (params.locationSource === 'exif') {
+      setLocationIsExif(true);
+      setLocationCustom(false);
+    }
   }, [params.address, params.latitude, params.longitude, params.locationSource]);
 
   // ─── Track keyboard visibility ───
@@ -113,20 +121,90 @@ export default function ReportScreen() {
   }, []);
 
   const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
+    let perm = await ImagePicker.getCameraPermissionsAsync();
+    if (perm.status !== 'granted') {
+      perm = await ImagePicker.requestCameraPermissionsAsync();
+    }
+    if (perm.status !== 'granted') {
       alert(t('report.cameraPermissionRequired'));
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: false,
-      quality: 0.8,
-    });
+    try {
+      let result: ImagePicker.ImagePickerResult;
+      try {
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 1,
+          exif: true,
+        });
+      } catch (exifError) {
+        console.warn('Camera retry without EXIF:', exifError);
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 1,
+          exif: false,
+        });
+      }
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImage(result.assets[0].uri);
-      router.setParams({ imageUri: result.assets[0].uri });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setImage(asset.uri);
+        router.setParams({ imageUri: asset.uri });
+
+        // Ưu tiên GPS trong EXIF của ảnh — đây mới là vị trí lúc chụp
+        const photoGps = extractGpsFromExif(asset.exif);
+        if (photoGps) {
+          setLocationLat(String(photoGps.latitude));
+          setLocationLng(String(photoGps.longitude));
+          setLocationIsExif(true);
+          setLocationCustom(false);
+          try {
+            const results = await Location.reverseGeocodeAsync({
+              latitude: photoGps.latitude,
+              longitude: photoGps.longitude,
+            });
+            if (results.length > 0) {
+              const r = results[0];
+              const parts = [r.streetNumber, r.street].filter(Boolean);
+              const line1 = parts.length > 0 ? parts.join(' ') : r.name || '';
+              const cityParts = [r.district, r.city, r.region].filter(Boolean);
+              setLocationAddress([line1, cityParts.join(', ')].filter(Boolean).join(', '));
+            }
+          } catch {
+            // Không có địa chỉ — vẫn giữ toạ độ từ ảnh
+          }
+        } else if (!locationLat) {
+          // Ảnh không có GPS → dùng vị trí thiết bị (giữ vị trí đã chọn nếu có)
+          setLocationIsExif(false);
+          try {
+            const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+            if (locStatus === 'granted') {
+              const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+              setLocationLat(String(loc.coords.latitude));
+              setLocationLng(String(loc.coords.longitude));
+              const results = await Location.reverseGeocodeAsync({
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+              });
+              if (results.length > 0) {
+                const r = results[0];
+                const parts = [r.streetNumber, r.street].filter(Boolean);
+                const line1 = parts.length > 0 ? parts.join(' ') : r.name || '';
+                const cityParts = [r.district, r.city, r.region].filter(Boolean);
+                setLocationAddress([line1, cityParts.join(', ')].filter(Boolean).join(', '));
+              }
+            }
+          } catch {
+            // Device location failed
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Error opening camera in report:', err);
+      alert(t('permissions.cameraError') + (err?.message ? `\n${err.message}` : ''));
     }
   };
 
@@ -140,7 +218,6 @@ export default function ReportScreen() {
       }
       return next;
     });
-    // console.log('Selected waste types:', Array.from(selectedWasteTypes));
   };
 
   const getSeverityLabel = (val: number): string => {
@@ -161,11 +238,17 @@ export default function ReportScreen() {
 
   const handleSubmit = async () => {
     if (!image) return alert(t('report.takePhotoFirst'));
+    // Không gửi toạ độ 0/NaN — server sẽ âm thầm ghim về Đắk Lắk
+    const lat = Number(locationLat);
+    const lng = Number(locationLng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+      return alert(t('report.locationRequired'));
+    }
 
     try {
       const { uri } = await ImageManipulator.manipulateAsync(
         image,
-        [],
+        [{ resize: { width: 1600 } }], // giữ dưới giới hạn 4MB của /api/upload
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
       );
 
@@ -174,11 +257,15 @@ export default function ReportScreen() {
       const formData = new FormData();
       const locationName = locationAddress || `${locationLat}, ${locationLng}`;
 
+      const uploaderName = user?.fullname || user?.email || 'EcoPick Admin';
       formData.append('reporter_id', user?.id || '');
+      formData.append('reporter_name', uploaderName);
+      formData.append('name', uploaderName);
+      formData.append('uploader', uploaderName);
       formData.append('title', locationName);
       formData.append('location', locationName);
-      formData.append('latitude', String(parseFloat(locationLat || '0')));
-      formData.append('longitude', String(parseFloat(locationLng || '0')));
+      formData.append('latitude', String(lat));
+      formData.append('longitude', String(lng));
       formData.append('severity', getSeverityApiValue(severityValue));
       formData.append('status', 'reviewing');
       formData.append('waste_type', Array.from(selectedWasteTypes).join(', '));
@@ -186,15 +273,14 @@ export default function ReportScreen() {
       if (description) formData.append('description', description);
       if (locationAddress) formData.append('address', locationAddress);
 
-      // Append image object directly as JPEG based on ImageManipulator settings
-      formData.append('report_img', {
-        uri,
-        name: `report_${Date.now()}.jpg`,
-        type: 'image/jpeg',
-      } as any);
-
-      if (__DEV__) {
-        // console.log('[handleSubmit] FormData parts:', (formData as any)._parts);
+      // Trên web, FormData stringify object thành "[object Object]" → server không thấy tệp.
+      // Phải đổi sang Blob thật thì busboy mới nhận ra file part.
+      const fileName = `report_${Date.now()}.jpg`;
+      if (Platform.OS === 'web') {
+        const blob = await fetch(uri).then((r) => r.blob());
+        formData.append('report_img', blob, fileName);
+      } else {
+        formData.append('report_img', { uri, name: fileName, type: 'image/jpeg' } as any);
       }
 
       const report = await createReportMutation.mutateAsync(formData);
@@ -209,6 +295,8 @@ export default function ReportScreen() {
         pathname: '/report-success',
         params: {
           reportId: report?.id || '',
+          pointsEarned: String(report?.pointsEarned ?? 0),
+          newTotal: String(report?.newTotal ?? ''),
           latitude: locationLat,
           longitude: locationLng,
         },
@@ -339,6 +427,11 @@ export default function ReportScreen() {
               <View style={styles.locationContent}>
                 <View style={styles.locationLabelRow}>
                   <Text style={styles.locationLabel}>{t('report.detectedLocation')}</Text>
+                  {locationIsExif && (
+                    <View style={[styles.customBadge, { backgroundColor: 'rgba(32, 105, 58, 0.12)' }]}>
+                      <Text style={[styles.customBadgeText, { color: '#20693A' }]}>GPS từ ảnh (EXIF)</Text>
+                    </View>
+                  )}
                   {locationCustom && (
                     <View style={styles.customBadge}>
                       <Text style={styles.customBadgeText}>{t('report.customLocation')}</Text>

@@ -88,6 +88,7 @@
 		"notesPlaceholder": "Provide more context here...",
 		"submitReport": "SUBMIT REPORT",
 		"takePhotoFirst": "Please take a photo first!",
+		"locationRequired": "Please choose a location before submitting.",
 		"cameraPermissionRequired": "Camera permissions are required",
 		"galleryPermissionRequired": "Photo library permission is required",
 		"plastic": "Plastic",
@@ -111,7 +112,8 @@
 		"title": "Permission Required",
 		"cameraMessage": "Camera permission is needed to report an issue. Please enable it in your device settings.",
 		"goWithoutPhoto": "Go without photo",
-		"cameraError": "Could not open the camera"
+		"cameraError": "Could not open the camera",
+		"galleryError": "Could not open the photo library"
 	},
 	"events": {
 		"headerTitle": "EcoPick Events",

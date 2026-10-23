@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,18 +17,24 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import LanguageToggle from '../../components/LanguageToggle';
 import { AuthColors, authStyles, Fonts } from '../../constants';
+import { useVerifyEmail, useForgotPassword } from '@/hooks/useUserQueries';
 
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 30;
 
 export default function VerifyScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ email?: string }>();
+  const email = params.email || 'admin@ecopick.vn';
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
 
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
+  const verifyEmail = useVerifyEmail();
+  const forgotPassword = useForgotPassword();
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [timer, setTimer] = useState(RESEND_SECONDS);
   const [canResend, setCanResend] = useState(false);
@@ -74,17 +81,60 @@ export default function VerifyScreen() {
 
   const handleResend = () => {
     if (!canResend) return;
-    setTimer(RESEND_SECONDS);
-    setCanResend(false);
-    setOtp(Array(OTP_LENGTH).fill(''));
-    inputRefs.current[0]?.focus();
+    forgotPassword.mutate(
+      { email },
+      {
+        onSuccess: (data: any) => {
+          Toast.show({
+            type: 'success',
+            text1: t('auth.resendSuccess', 'Đã gửi lại mã OTP!'),
+            text2: data?.otp ? `Mã thử nghiệm: ${data.otp}` : undefined,
+          });
+          setTimer(RESEND_SECONDS);
+          setCanResend(false);
+          setOtp(Array(OTP_LENGTH).fill(''));
+          inputRefs.current[0]?.focus();
+        },
+        onError: (err: any) => {
+          Toast.show({
+            type: 'error',
+            text1: t('auth.resendFailed', 'Gửi lại mã thất bại'),
+            text2: err?.message,
+          });
+        },
+      }
+    );
   };
 
   const handleVerify = () => {
-    router.push('/auth/complete-profile');
+    const code = otp.join('');
+    if (code.length < OTP_LENGTH) return;
+    verifyEmail.mutate(
+      { email, otp: code },
+      {
+        onSuccess: () => {
+          Toast.show({
+            type: 'success',
+            text1: t('auth.verifySuccess', 'Xác thực email thành công!'),
+          });
+          setTimeout(() => {
+            router.push('/auth/complete-profile');
+          }, 400);
+        },
+        onError: (err: any) => {
+          const msg = err?.response?.data?.error?.message || err?.response?.data?.detail || err?.message || 'Mã xác thực không đúng';
+          Toast.show({
+            type: 'error',
+            text1: t('auth.verifyFailed', 'Xác thực thất bại'),
+            text2: msg,
+          });
+        },
+      }
+    );
   };
 
   const isComplete = otp.every((d) => d !== '');
+  const isSubmitting = verifyEmail.isPending || forgotPassword.isPending;
 
   return (
     <View style={styles.container}>
@@ -173,15 +223,25 @@ export default function VerifyScreen() {
             </View>
 
             {/* Verify Button */}
-            <TouchableOpacity activeOpacity={isComplete ? 0.85 : 1} onPress={isComplete ? handleVerify : undefined}>
+            <TouchableOpacity
+              activeOpacity={isComplete && !isSubmitting ? 0.85 : 1}
+              onPress={isComplete && !isSubmitting ? handleVerify : undefined}
+              disabled={!isComplete || isSubmitting}
+            >
               <LinearGradient
-                colors={isComplete ? ['#144227', '#2D5A3D'] : ['#94A3B8', '#94A3B8']}
+                colors={isComplete && !isSubmitting ? ['#144227', '#2D5A3D'] : ['#94A3B8', '#94A3B8']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={authStyles.primaryButton}
               >
-                <Text style={authStyles.primaryButtonText}>{t('auth.verify')}</Text>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+                {isSubmitting ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <>
+                    <Text style={authStyles.primaryButtonText}>{t('auth.verify')}</Text>
+                    <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>

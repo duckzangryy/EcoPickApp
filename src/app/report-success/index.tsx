@@ -2,14 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Fonts, Spacing } from '../../constants';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { reportService } from '../../api/services/reportService';
-import { useUpdateUser } from '../../hooks/useUserQueries';
 import { useAuthStore } from '../../stores/authStore';
 import PointsCard from './components/PointsCard';
 import SuccessActions from './components/SuccessActions';
@@ -19,65 +17,30 @@ const { width } = Dimensions.get('window');
 
 export default function ReportSuccessScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ reportId?: string; latitude?: string; longitude?: string }>();
+  const params = useLocalSearchParams<{ reportId?: string; latitude?: string; longitude?: string; pointsEarned?: string; newTotal?: string }>();
   const { t } = useTranslation();
-
   const user = useAuthStore(s => s.user);
   const updateUserStore = useAuthStore(s => s.updateUser);
-  const updateUserMutation = useUpdateUser();
-  const hasAwardedRef = useRef(false);
+  const awardedPoints = Number(params.pointsEarned || 0);
 
   useEffect(() => {
-    const awardPoints = async () => {
-      if (!user?.id || hasAwardedRef.current) return;
-      hasAwardedRef.current = true;
-
-      try {
-        const userReports = await reportService.getAll({ reporter_id: user.id });
-        const totalReports = userReports.length;
-
-        const newEcoPoints = (user.eco_points || 0) + 10;
-        const newLevel = (user.level || 0) + 1;
-
-        await updateUserMutation.mutateAsync({
-          id: user.id,
-          payload: {
-            eco_points: newEcoPoints,
-            level: newLevel,
-            total_reports: totalReports,
-          }
-        });
-
-        updateUserStore({
-          eco_points: newEcoPoints,
-          level: newLevel,
-          total_reports: totalReports,
-        });
-      } catch (error) {
-        console.error("Failed to award eco points:", error);
-      }
-    };
-
-    awardPoints();
-  }, [user?.id]);
+    const newTotal = Number(params.newTotal);
+    if (Number.isFinite(newTotal) && params.newTotal) updateUserStore({ eco_points: newTotal });
+  }, [params.newTotal, updateUserStore]);
 
   const handleViewOnMap = () => {
     if (params.latitude && params.longitude) {
+      // focusLat/focusLng = chỉ di chuyển bản đồ tới vị trí ảnh, không vẽ đường đi
       router.replace({
         pathname: '/map',
         params: {
-          destLat: params.latitude,
-          destLng: params.longitude,
-          destTitle: 'Your Report',
+          focusLat: params.latitude,
+          focusLng: params.longitude,
         },
       });
     } else {
       router.replace('/map');
     }
-  };
-
-  const handleContinueExploring = () => {
-    router.replace('/map');
   };
 
   const handleClose = () => {
@@ -116,7 +79,7 @@ export default function ReportSuccessScreen() {
 
           <View style={styles.pointsPill}>
             <Ionicons name="star" size={16} color="#FBBF24" />
-            <Text style={styles.pointsPillText}>{t('reportSuccess.earnedPoints')}</Text>
+            <Text style={styles.pointsPillText}>{awardedPoints} {t('reportSuccess.earnedPoints')}</Text>
           </View>
 
           <PointsCard

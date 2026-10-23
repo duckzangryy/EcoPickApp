@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Fonts, FontSizes, LineHeights, Spacing } from '../../../constants';
+import { Fonts, FontSizes, LineHeights, Spacing } from '../../../constants';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 
 interface SectionHeaderProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -10,13 +12,14 @@ interface SectionHeaderProps {
 }
 
 export default function SectionHeader({ icon, title, description }: SectionHeaderProps) {
+  const colors = getColors(useThemeStore((state) => state.theme));
   return (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionHeaderRow}>
-        <Ionicons name={icon} size={18} color={Colors.primary} />
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Ionicons name={icon} size={18} color={colors.primary} />
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{title}</Text>
       </View>
-      {description ? <Text style={styles.sectionDesc}>{description}</Text> : null}
+      {description ? <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>{description}</Text> : null}
     </View>
   );
 }
@@ -35,13 +38,13 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bold,
     fontSize: FontSizes.base,
     lineHeight: LineHeights.base,
-    color: Colors.textPrimary,
+    color: '#0F172A',
   },
   sectionDesc: {
     fontFamily: Fonts.regular,
     fontSize: FontSizes.sm,
     lineHeight: LineHeights.sm,
-    color: Colors.textSecondary,
+    color: '#64748B',
     marginTop: 2,
     paddingLeft: 26,
   },

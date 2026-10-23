@@ -1,4 +1,4 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# Learn more https://docs.github.com/en/get-started/getting-started-with-github/ignoring-files
 
 # dependencies
 node_modules/
@@ -31,7 +31,7 @@ yarn-error.*
 *.pem
 
 # local env files
-.env*.local
+.env*
 
 # typescript
 *.tsbuildinfo
@@ -42,8 +42,15 @@ app-example
 /ios
 /android
 
-.env
-.env.local
-
 .agents/
 .claude/
+
+# Ruflo local secrets and runtime data
+.claude-flow/
+.swarm/
+ruvector.db
+
+# Codex local configuration
+.codex/
+# Claude Flow runtime data
+# Environment variables

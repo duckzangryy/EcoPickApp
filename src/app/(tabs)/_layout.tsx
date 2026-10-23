@@ -6,26 +6,36 @@ import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, DeviceEventEmitter, Platform, StyleSheet, Text, View } from 'react-native';
 import { ImageSourceSheet } from '../../components/ImageSourceSheet';
+import { useAuthStore } from '../../stores/authStore';
 import { Colors, Fonts, FontSizes } from '../../constants';
 
 import Toast from 'react-native-toast-message';
 import { useLayout } from '../../hooks/use-layout';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
+import { extractGpsFromExif } from '../../utils/exif';
 
 export default function TabLayout() {
   const {bottomTabHeight } = useLayout();
   const router = useRouter();
   const { t } = useTranslation();
   const [showSheet, setShowSheet] = useState(false);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const theme = useThemeStore((state) => state.theme);
+  const colors = getColors(theme);
 
   const handleReportPress = (e: any) => {
     e.preventDefault();
     setShowSheet(true);
   };
 
-  // ── Camera flow: take photo → get GPS → go to /report with image + location ──
+  // ── Camera flow ──
   const handleSelectCamera = useCallback(async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
+    let perm = await ImagePicker.getCameraPermissionsAsync();
+    if (perm.status !== 'granted') {
+      perm = await ImagePicker.requestCameraPermissionsAsync();
+    }
+    if (perm.status !== 'granted') {
       Alert.alert(
         t('permissions.title'),
         t('permissions.cameraMessage'),
@@ -38,28 +48,57 @@ export default function TabLayout() {
     }
 
     try {
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: false,
-        quality: 0.8,
-      });
+      let result: ImagePicker.ImagePickerResult;
+      try {
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 1,
+          exif: true,
+        });
+      } catch (exifError) {
+        console.warn('Camera retry without EXIF:', exifError);
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 1,
+          exif: false,
+        });
+      }
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const imageUri = result.assets[0].uri;
+        const asset = result.assets[0];
+        const imageUri = asset.uri;
 
-        // Try to get current GPS location for camera photos
+        // Vị trí chụp: ưu tiên EXIF, chỉ fallback sang GPS thiết bị
         let latitude = '';
         let longitude = '';
         let address = '';
-        try {
-          const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
-          if (locStatus === 'granted') {
-            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-            latitude = String(loc.coords.latitude);
-            longitude = String(loc.coords.longitude);
-            // Reverse geocode for address
+        let locationSource: string | undefined;
+
+        const photoGps = extractGpsFromExif(asset.exif);
+        if (photoGps) {
+          latitude = String(photoGps.latitude);
+          longitude = String(photoGps.longitude);
+          locationSource = 'exif';
+        } else {
+          try {
+            const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+            if (locStatus === 'granted') {
+              const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+              latitude = String(loc.coords.latitude);
+              longitude = String(loc.coords.longitude);
+            }
+          } catch {
+            // Location fetch failed, proceed without it
+          }
+        }
+
+        if (latitude && longitude) {
+          try {
             const results = await Location.reverseGeocodeAsync({
-              latitude: loc.coords.latitude,
-              longitude: loc.coords.longitude,
+              latitude: parseFloat(latitude),
+              longitude: parseFloat(longitude),
             });
             if (results.length > 0) {
               const r = results[0];
@@ -68,24 +107,27 @@ export default function TabLayout() {
               const cityParts = [r.district, r.city, r.region].filter(Boolean);
               address = [line1, cityParts.join(', ')].filter(Boolean).join(', ');
             }
+          } catch {
+            // Reverse geocode failed — coordinates are enough
           }
-        } catch {
-          // Location fetch failed, proceed without it
         }
 
         router.push({
           pathname: '/report',
-          params: { imageUri, latitude, longitude, address, source: 'camera' }
+          params: { imageUri, latitude, longitude, address, source: 'camera', ...(locationSource ? { locationSource } : {}) }
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error opening camera:', error);
-      // Alert.alert(t('common.error'), t('permissions.cameraError'));
-      Toast.show({ type: 'error', text1: t('permissions.cameraError') });
+      Toast.show({
+        type: 'error',
+        text1: t('permissions.cameraError'),
+        text2: error?.message || String(error),
+      });
     }
   }, [router, t]);
 
-  // ── Gallery flow: pick image → pick-location → /report ──
+  // ── Gallery flow: pick image → extract EXIF GPS → pick-location → /report ──
   const handleSelectGallery = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -98,21 +140,59 @@ export default function TabLayout() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: false,
-        quality: 0.8,
+        quality: 1,
+        exif: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const imageUri = result.assets[0].uri;
-        // Navigate to pick-location, which will then forward to /report
+        const asset = result.assets[0];
+        const imageUri = asset.uri;
+        const coords = extractGpsFromExif(asset.exif);
+
+        let initialLat = '';
+        let initialLng = '';
+        let address = '';
+
+        if (coords) {
+          initialLat = String(coords.latitude);
+          initialLng = String(coords.longitude);
+          try {
+            const results = await Location.reverseGeocodeAsync({
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+            });
+            if (results.length > 0) {
+              const r = results[0];
+              const parts = [r.streetNumber, r.street].filter(Boolean);
+              const line1 = parts.length > 0 ? parts.join(' ') : r.name || '';
+              const cityParts = [r.district, r.city, r.region].filter(Boolean);
+              address = [line1, cityParts.join(', ')].filter(Boolean).join(', ');
+            }
+          } catch {
+            // Geocode failed, proceed with coordinates
+          }
+        }
+
+        // Navigate to pick-location, which will center on photo coordinates and forward to /report
         router.push({
           pathname: '/pick-location',
-          params: { imageUri, returnTo: 'report-gallery' }
+          params: {
+            imageUri,
+            initialLat,
+            initialLng,
+            address,
+            locationSource: coords ? 'exif' : undefined,
+            returnTo: 'report-gallery',
+          },
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error opening gallery:', error);
-      // Alert.alert(t('common.error'), t('permissions.cameraError'));
-      Toast.show({ type: 'error', text1: t('permissions.cameraError') });
+      Toast.show({
+        type: 'error',
+        text1: t('permissions.galleryError'),
+        text2: error?.message || String(error),
+      });
     }
   }, [router, t]);
 
@@ -121,9 +201,10 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarStyle: [styles.tabBar, { height: bottomTabHeight }],
-          tabBarActiveTintColor: Colors.primary,
-          tabBarInactiveTintColor: Colors.textInactive,
+          tabBarStyle: [styles.tabBar, { height: bottomTabHeight, backgroundColor: colors.card, borderTopColor: colors.border }],
+          sceneStyle: { backgroundColor: colors.background },
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.textInactive,
           tabBarLabelStyle: styles.tabBarLabel
         }}
       >
@@ -208,7 +289,12 @@ export default function TabLayout() {
             ),
           }}
           listeners={{
-            tabPress: () => {
+            tabPress: (event) => {
+              if (!isAuthenticated) {
+                event.preventDefault();
+                router.push('/auth/login');
+                return;
+              }
               DeviceEventEmitter.emit('tabPress_profile');
             },
           }}

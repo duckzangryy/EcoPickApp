@@ -6,6 +6,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "react-native-maps": [
+        "./src/components/map/react-native-maps.native.tsx"
       ]
     }
   },

@@ -1,8 +1,9 @@
-import { useSignIn } from '@/hooks/useUserQueries';
+import { useForgotPassword, useSignIn } from '@/hooks/useUserQueries';
 import { loginSchema, type LoginFormData } from '@/lib/validations/auth';
 import { useCommonStore } from '@/stores';
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ENV } from '@/config/env';
 import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -34,25 +35,24 @@ export default function LoginScreen() {
   const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const { rememberedEmail, rememberedPassword, setRememberedCredentials, clearRememberedCredentials } = useCommonStore();
-  // console.log('===rememberedEmail:', rememberedEmail, 'rememberedPassword:', rememberedPassword);
   const [rememberMe, setRememberMe] = useState(!!rememberedEmail);
 
-
   const signIn = useSignIn();
-  const API_BASE_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL;
-  // console.error("API Base URL in login:", API_BASE_URL);
+  const forgotPassword = useForgotPassword();
+  const API_BASE_URL = ENV.API_BASE_URL;
 
   // ─── React Hook Form + Zod ────────────────────────────────
   const {
     control,
     handleSubmit,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: rememberedEmail || '',
-      password: rememberedPassword || '',
+      password: '',
     },
   });
 
@@ -61,10 +61,46 @@ export default function LoginScreen() {
       setValue('email', rememberedEmail);
       setRememberMe(true);
     }
-    if (rememberedPassword) {
-      setValue('password', rememberedPassword);
+    setValue('password', '');
+  }, [rememberedEmail, setValue]);
+
+  // ─── Forgot Password handler ──────────────────────────────
+  const handleForgotPassword = () => {
+    const email = getValues('email')?.trim();
+    if (!email) {
+      Toast.show({
+        type: 'error',
+        text1: 'Vui lòng nhập Email',
+        text2: 'Hãy điền email của bạn để nhận mã OTP khôi phục mật khẩu.',
+      });
+      return;
     }
-  }, [rememberedEmail, rememberedPassword, setValue]);
+    forgotPassword.mutate(
+      { email },
+      {
+        onSuccess: (data: any) => {
+          Toast.show({
+            type: 'success',
+            text1: 'Đã gửi mã xác nhận!',
+            text2: data?.otp ? `Mã OTP: ${data.otp}` : 'Vui lòng kiểm tra hộp thư email.',
+          });
+          router.push({ pathname: '/auth/verify', params: { email } });
+        },
+        onError: (err: any) => {
+          const msg =
+            err?.response?.data?.error?.message ||
+            err?.response?.data?.detail ||
+            err?.message ||
+            'Không thể gửi mã xác nhận';
+          Toast.show({
+            type: 'error',
+            text1: 'Lỗi gửi mã',
+            text2: msg,
+          });
+        },
+      }
+    );
+  };
 
   // ─── Submit handler ────────────────────────────────────────
   const onSubmit = (data: LoginFormData) => {
@@ -78,24 +114,28 @@ export default function LoginScreen() {
             text1: t('auth.loginSuccess'),
             text2: t('auth.loginSuccessDesc'),
           });
-          // Xử lý Remember Me
+          // Xử lý Remember Me (chỉ lưu email, không lưu mật khẩu)
           if (rememberMe) {
-            setRememberedCredentials(data.email.trim(), data.password);
+            setRememberedCredentials(data.email.trim(), undefined);
           } else {
             clearRememberedCredentials();
           }
+          setTimeout(() => {
+            router.replace('/(tabs)/map');
+          }, 300);
         },
         onError: (error: any) => {
           const errorMsg =
+            error?.response?.data?.error?.message ||
             error?.response?.data?.detail ||
             error?.response?.data?.error ||
             error?.message ||
-            'Đăng nhập thất bại. Vui lòng kiểm tra lại.';
+            t('auth.loginFailed');
           console.log('LOGIN ERROR:', errorMsg);
           Toast.show({
             type: 'error',
             text1: t('auth.loginFailedTitle'),
-            text2: t('auth.loginFailed'),
+            text2: errorMsg,
           });
         },
       },
@@ -182,8 +222,10 @@ export default function LoginScreen() {
               <View>
                 <View style={styles.passwordHeader}>
                   <Text style={authStyles.label}>{t('auth.passwordLabel')}</Text>
-                  <TouchableOpacity activeOpacity={0.7}>
-                    <Text style={styles.forgotLink}>{t('auth.forgotPassword')}</Text>
+                  <TouchableOpacity activeOpacity={0.7} onPress={handleForgotPassword} disabled={forgotPassword.isPending}>
+                    <Text style={styles.forgotLink}>
+                      {forgotPassword.isPending ? 'Đang gửi...' : t('auth.forgotPassword')}
+                    </Text>
                   </TouchableOpacity>
                 </View>
                 <Controller

@@ -18,8 +18,11 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import LanguageToggle from '../../components/LanguageToggle';
 import { AuthColors, authStyles, Fonts } from '../../constants';
+import { useUpdateUser } from '@/hooks/useUserQueries';
+import { useAuthStore } from '@/stores/authStore';
 
 const INTERESTS = [
   { id: 'beach', icon: 'water-outline' as const, label: 'Beach', labelKey: 'auth.interestBeach' as const },
@@ -40,6 +43,8 @@ export default function CompleteProfileScreen() {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [nearbyCleanups, setNearbyCleanups] = useState(true);
   const [ecoAchievements, setEcoAchievements] = useState(true);
+  const updateUser = useUpdateUser();
+  const authUser = useAuthStore((s) => s.user);
 
   const toggleInterest = (id: string) => {
     setSelectedInterests((prev) =>
@@ -48,8 +53,28 @@ export default function CompleteProfileScreen() {
   };
 
   const handleComplete = () => {
-    // TODO: Save profile and navigate to main app
-    router.replace('/(tabs)');
+    const payload = {
+      username: username.trim() || undefined,
+      address: location.trim() || undefined,
+      bio: selectedInterests.length ? `Quan tâm: ${selectedInterests.join(', ')}` : undefined,
+    };
+    updateUser.mutate(
+      {
+        id: authUser?.id || 'me',
+        payload,
+      },
+      {
+        onSettled: () => {
+          Toast.show({
+            type: 'success',
+            text1: t('auth.profileSetupSuccess', 'Hoàn tất cài đặt hồ sơ!'),
+          });
+          setTimeout(() => {
+            router.replace('/(tabs)/map');
+          }, 400);
+        },
+      }
+    );
   };
 
   const progress = [username.length > 0, location.length > 0, selectedInterests.length >= 1].filter(Boolean).length;

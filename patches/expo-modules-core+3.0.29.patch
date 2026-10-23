@@ -1,0 +1,65 @@
+diff --git a/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/activityresult/AppContextActivityResultRegistry.kt b/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/activityresult/AppContextActivityResultRegistry.kt
+index a5b971e..f0b3550 100644
+--- a/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/activityresult/AppContextActivityResultRegistry.kt
++++ b/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/activityresult/AppContextActivityResultRegistry.kt
+@@ -29,6 +29,8 @@ import expo.modules.kotlin.safeGetParcelable
+ import expo.modules.kotlin.safeGetParcelableExtra
+ import java.io.Serializable
+ import java.util.Random
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
+ 
+ private const val TAG = "ActivityResultRegistry"
+ 
+@@ -222,6 +224,7 @@ class AppContextActivityResultRegistry(
+     return object : AppContextActivityResultLauncher<I, O>() {
+       override fun launch(input: I, callback: ActivityResultCallback<O>) {
+         val requestCode = keyToRequestCode[key]
++          ?: reregister(key, contract, fallbackCallback)
+           ?: throw IllegalStateException("Attempting to launch an unregistered ActivityResultLauncher with contract $contract and input $input. You must ensure the ActivityResultLauncher is registered before calling launch()")
+ 
+         keyToCallbacksAndContract[key] = CallbacksAndContract(fallbackCallback, callback, contract)
+@@ -336,6 +339,43 @@ class AppContextActivityResultRegistry(
+     }
+   }
+ 
++  /**
++   * Re-registers a key whose Activity was destroyed and recreated (the [ON_DESTROY] branch of
++   * [register] drops `keyToRequestCode`, while the launcher owned by the module survives).
++   * Must run on the main thread because [register] adds a LifecycleEventObserver.
++   *
++   * @return the request code, or null if no live Activity is available.
++   */
++  private fun <I : Serializable, O> reregister(
++    key: String,
++    contract: AppContextActivityResultContract<I, O>,
++    fallbackCallback: AppContextActivityResultFallbackCallback<I, O>
++  ): Int? {
++    val liveActivity = currentActivityProvider.currentActivity as? AppCompatActivity ?: return null
++
++    val work = {
++      register(key, liveActivity, contract, fallbackCallback)
++      keyToRequestCode[key]
++    }
++    if (Looper.myLooper() == Looper.getMainLooper()) return work()
++
++    var result: Int? = null
++    var failure: Throwable? = null
++    val latch = CountDownLatch(1)
++    Handler(Looper.getMainLooper()).post {
++      try {
++        result = work()
++      } catch (e: Throwable) {
++        failure = e
++      } finally {
++        latch.countDown()
++      }
++    }
++    if (!latch.await(2, TimeUnit.SECONDS)) return null
++    failure?.let { throw it }
++    return result
++  }
++
+   private fun generateRandomNumber(): Int {
+     var number = (random.nextInt(Int.MAX_VALUE - INITIAL_REQUEST_CODE_VALUE + 1) + INITIAL_REQUEST_CODE_VALUE)
+     while (requestCodeToKey.containsKey(number)) {

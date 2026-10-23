@@ -1,6 +1,8 @@
 import { useUserBadges } from '@/hooks';
+import { useRedemptions } from '@/hooks/useBadgeQueries';
 import { useLayout } from '@/hooks/use-layout';
 import { useUpdateUser, useUserInfo } from '@/hooks/useUserQueries';
+import { LOCAL_USER } from '@/api/services/userService';
 import { useAuthStore } from '@/stores/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +26,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { BorderRadius, Colors, Fonts, FontSizes, Spacing } from '../../constants';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 import { pickImage, type PickedImage } from '../../utils/pickImage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -131,26 +135,28 @@ function StatCard({
   label,
   value,
   bgColor,
+  colors,
 }: {
   icon: string;
   iconColor: string;
   label: string;
   value: number;
   bgColor: string;
+  colors: ReturnType<typeof getColors>;
 }) {
   return (
-    <View style={styles.statCard}>
+    <View style={[styles.statCard, { backgroundColor: colors.card } ]}>
       <View style={[styles.statIconContainer, { backgroundColor: bgColor }]}>
         <Ionicons name={icon as any} size={18} color={iconColor} />
       </View>
-      <AnimatedCounter value={value} style={styles.statValue} />
-      <Text style={styles.statLabel}>{label}</Text>
+      <AnimatedCounter value={value} style={[styles.statValue, { color: colors.textPrimary }]} />
+      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
     </View>
   );
 }
 
 // ─── Activity Item ───
-function ActivityItem({ activity }: { activity: any }) {
+function ActivityItem({ activity, colors }: { activity: any; colors: ReturnType<typeof getColors> }) {
   const iconMap: Record<string, { icon: string; color: string; bg: string }> = {
     report: { icon: 'flag', color: '#16A34A', bg: 'rgba(22,163,74,0.1)' },
     event: { icon: 'calendar', color: '#F97316', bg: 'rgba(249,115,22,0.1)' },
@@ -160,15 +166,15 @@ function ActivityItem({ activity }: { activity: any }) {
   const config = iconMap[activity.type] || iconMap.report;
 
   return (
-    <View style={styles.activityItem}>
+    <View style={[styles.activityItem, { backgroundColor: colors.card } ]}>
       <View style={[styles.activityIcon, { backgroundColor: config.bg }]}>
         <Ionicons name={config.icon as any} size={18} color={config.color} />
       </View>
       <View style={styles.activityContent}>
-        <Text style={styles.activityTitle}>{activity.title}</Text>
-        <Text style={styles.activityTime}>{activity.time}</Text>
+        <Text style={[styles.activityTitle, { color: colors.textPrimary }]}>{activity.title}</Text>
+        <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+      <Ionicons name="chevron-forward" size={16} color={colors.textPlaceholder} />
     </View>
   );
 }
@@ -179,17 +185,28 @@ function ActivityItem({ activity }: { activity: any }) {
 export default function ProfileScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const theme = useThemeStore((s) => s.theme);
+  const colors = getColors(theme);
   const insets = useSafeAreaInsets();
   const {bottomTabHeight} = useLayout();
   const updateUserMutation = useUpdateUser();
   const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollRef = React.useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('tabPress_profile', () => {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+    return () => sub.remove();
+  }, []);
 
   // Auth & user data
   const storeUser = useAuthStore((s) => s.user);
-  const { data: apiUser, isPending: isLoadingUser, isRefetching, refetch } = useUserInfo();
-  const user = apiUser ?? storeUser;
+  const { data: apiUser, isLoading: isFetchingUser, isRefetching, refetch } = useUserInfo();
+  const user = apiUser ?? storeUser ?? LOCAL_USER;
 
   const { data: userBadges } = useUserBadges({ user_id: user?.id, limit: 100 });
+  const { data: redemptions = [] } = useRedemptions();
 
   // Avatar & Banner state
   const [pendingAvatar, setPendingAvatar] = useState<PickedImage | null>(null);
@@ -278,30 +295,22 @@ export default function ProfileScreen() {
   });
 
   // ── Loading state ──
-  if (isLoadingUser && !storeUser) {
+  if (isFetchingUser && !user) {
     return (
       <View style={styles.safeArea}>
-        <StatusBar style="light" />
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
         <ProfileSkeleton />
       </View>
     );
   }
-
-  // ── Handle Tab Press ──
-  const scrollRef = React.useRef<ScrollView>(null);
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('tabPress_profile', () => {
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
-    });
-    return () => sub.remove();
-  }, []);
 
   const avatarUri = pendingAvatar?.uri || user?.avatar || DEFAULT_AVATAR;
   const bannerUri = pendingBanner?.uri || DEFAULT_BANNER;
   const displayName = user?.fullname || user?.email?.split('@')[0] || 'User';
 
   return (
-    <View style={styles.safeArea}>
+    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
 
       {/* ─── Floating Header (appears on scroll) ─── */}
       <Animated.View
@@ -310,11 +319,12 @@ export default function ProfileScreen() {
           {
             paddingTop: insets.top,
             opacity: headerBgOpacity,
+            backgroundColor: colors.background,
           },
         ]}
       >
         <View style={styles.floatingHeaderInner}>
-          <Text style={styles.floatingHeaderTitle} numberOfLines={1}>
+          <Text style={[styles.floatingHeaderTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {displayName}
           </Text>
         </View>
@@ -361,11 +371,11 @@ export default function ProfileScreen() {
         {/* ═══════════════════════════════════════════════════ */}
         {/* AVATAR + USER INFO                                 */}
         {/* ═══════════════════════════════════════════════════ */}
-        <View style={styles.profileInfoSection}>
+        <View style={[styles.profileInfoSection, { backgroundColor: colors.card } ]}>
           {/* Avatar floating over banner */}
           <View style={styles.avatarContainer}>
             <TouchableOpacity style={styles.avatarWrapper} activeOpacity={0.8} onPress={handleSelectAvatar}>
-              <View style={styles.avatarBorder}>
+              <View style={[styles.avatarBorder, { backgroundColor: colors.card, borderColor: colors.card }]} >
                 <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
               </View>
               <View style={styles.avatarEditBadge}>
@@ -375,7 +385,7 @@ export default function ProfileScreen() {
 
             {/* Edit Profile Button */}
             <TouchableOpacity
-              style={styles.editProfileBtn}
+              style={[styles.editProfileBtn, { backgroundColor: colors.card }]}
               activeOpacity={0.7}
               onPress={() => router.push('/profile/edit-profile')}
             >
@@ -387,11 +397,11 @@ export default function ProfileScreen() {
           {/* User Info */}
           <View style={styles.userInfo}>
             <View style={styles.nameRow}>
-              <Text style={styles.userName}>{displayName}</Text>
+              <Text style={[styles.userName, { color: colors.textPrimary }]}>{displayName}</Text>
               {user?.is_verified && <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />}
             </View>
             <View style={styles.userMetaRow}>
-              <Text style={styles.userHandle}>{user?.email}</Text>
+              <Text style={[styles.userHandle, { color: colors.textSecondary }]}>{user?.email}</Text>
               <View style={styles.metaItem}>
                 <Ionicons name="leaf" size={14} color={Colors.primary} />
                 <Text style={[styles.metaText, { color: Colors.primary }]}>{t('profile.level', { level: user?.level ?? 1 })}</Text>
@@ -407,7 +417,7 @@ export default function ProfileScreen() {
             </View>
 
             {user?.bio ? (
-              <Text style={styles.userBio} numberOfLines={3}>
+              <Text style={[styles.userBio, { color: colors.textSecondary }]} numberOfLines={3}>
                 {user.bio}
               </Text>
             ) : null}
@@ -416,20 +426,20 @@ export default function ProfileScreen() {
           </View>
 
           {/* ─── Social Stats Bar ─── */}
-          <View style={styles.socialStatsBar}>
+          <View style={[styles.socialStatsBar, { borderTopColor: colors.border } ]}>
             <TouchableOpacity style={styles.socialStatItem} activeOpacity={0.6}>
-              <Text style={styles.socialStatValue}>{user?.followers_count ?? 0}</Text>
-              <Text style={styles.socialStatLabel}>{t('profile.followers')}</Text>
+              <Text style={[styles.socialStatValue, { color: colors.textPrimary }]}>{user?.followers_count ?? 0}</Text>
+              <Text style={[styles.socialStatLabel, { color: colors.textSecondary }]}>{t('profile.followers')}</Text>
             </TouchableOpacity>
-            <View style={styles.socialStatDivider} />
+            <View style={[styles.socialStatDivider, { backgroundColor: colors.border }]} />
             <TouchableOpacity style={styles.socialStatItem} activeOpacity={0.6}>
-              <Text style={styles.socialStatValue}>{user?.following_count ?? 0}</Text>
-              <Text style={styles.socialStatLabel}>{t('profile.following')}</Text>
+              <Text style={[styles.socialStatValue, { color: colors.textPrimary }]}>{user?.following_count ?? 0}</Text>
+              <Text style={[styles.socialStatLabel, { color: colors.textSecondary }]}>{t('profile.following')}</Text>
             </TouchableOpacity>
-            <View style={styles.socialStatDivider} />
+            <View style={[styles.socialStatDivider, { backgroundColor: colors.border }]} />
             <TouchableOpacity style={styles.socialStatItem} activeOpacity={0.6}>
-              <Text style={styles.socialStatValue}>{user?.total_trees ?? 0}</Text>
-              <Text style={styles.socialStatLabel}>{t('profile.trees')}</Text>
+              <Text style={[styles.socialStatValue, { color: colors.textPrimary }]}>{user?.total_trees ?? 0}</Text>
+              <Text style={[styles.socialStatLabel, { color: colors.textSecondary }]}>{t('profile.trees')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -437,48 +447,67 @@ export default function ProfileScreen() {
         {/* ═══════════════════════════════════════════════════ */}
         {/* STATS GRID                                         */}
         {/* ═══════════════════════════════════════════════════ */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>{t('profile.impactStats')}</Text>
+        <View style={[styles.sectionContainer, { backgroundColor: colors.background } ]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('profile.impactStats')}</Text>
           <View style={styles.statsGrid}>
-            <StatCard
-              icon="flag-outline"
-              iconColor="#16A34A"
-              label={t('profile.reports')}
-              value={user?.total_reports ?? 0}
-              bgColor="rgba(22,163,74,0.1)"
-            />
-            <StatCard
-              icon="calendar-outline"
-              iconColor="#F97316"
-              label={t('profile.events')}
-              value={user?.total_events ?? 0}
-              bgColor="rgba(249,115,22,0.1)"
-            />
-            <StatCard
-              icon="leaf-outline"
-              iconColor="#20693A"
-              label={t('profile.trees')}
-              value={user?.total_trees ?? 0}
-              bgColor="rgba(32,105,58,0.1)"
-            />
-            <StatCard
-              icon="star-outline"
-              iconColor="#EAB308"
-              label={t('profile.ecoPoints')}
-              value={user?.eco_points ?? 0}
-              bgColor="rgba(234,179,8,0.1)"
-            />
+            <View style={styles.statsRow}>
+              <StatCard
+                icon="flag-outline"
+                iconColor={theme === 'dark' ? '#75D79A' : '#16A34A'}
+                label={t('profile.reports')}
+                value={user?.total_reports ?? 0}
+                bgColor={colors.primaryLight}
+                colors={colors}
+              />
+              <StatCard
+                icon="calendar-outline"
+                iconColor="#FB923C"
+                label={t('profile.events')}
+                value={user?.total_events ?? 0}
+                bgColor={theme === 'dark' ? 'rgba(251,146,60,0.18)' : 'rgba(249,115,22,0.1)'}
+                colors={colors}
+              />
+            </View>
+            <View style={styles.statsRow}>
+              <StatCard
+                icon="leaf-outline"
+                iconColor={colors.primary}
+                label={t('profile.trees')}
+                value={user?.total_trees ?? 0}
+                bgColor={colors.primaryLight}
+                colors={colors}
+              />
+              <StatCard
+                icon="star-outline"
+                iconColor={theme === 'dark' ? '#FDE047' : '#CA8A04'}
+                label={t('profile.ecoPoints')}
+                value={user?.eco_points ?? 0}
+                bgColor={theme === 'dark' ? 'rgba(250,204,21,0.18)' : 'rgba(234,179,8,0.1)'}
+                colors={colors}
+              />
+            </View>
           </View>
+        </View>
+
+        <View style={[styles.sectionContainer, { backgroundColor: colors.background } ]}>
+          <TouchableOpacity style={[styles.rewardsEntry, { backgroundColor: colors.card, borderColor: colors.border } ]} activeOpacity={0.75} onPress={() => router.push('/redemptions' as any)}>
+            <View style={styles.rewardsEntryIcon}><Ionicons name="gift" size={21} color={Colors.primary} /></View>
+            <View style={styles.rewardsEntryText}>
+              <Text style={[styles.rewardsEntryTitle, { color: colors.textPrimary }]}>Phần thưởng đã đổi</Text>
+              <Text style={[styles.rewardsEntrySubtitle, { color: colors.textSecondary }]}>{redemptions.length} phần thưởng · Xem mã QR</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+          </TouchableOpacity>
         </View>
 
         {/* ═══════════════════════════════════════════════════ */}
         {/* USER ACTIVITY MAP PREVIEW                          */}
         {/* ═══════════════════════════════════════════════════ */}
-        <View style={styles.sectionContainer}>
+        <View style={[styles.sectionContainer, { backgroundColor: colors.background } ]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t('profile.myActivityMap')}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('profile.myActivityMap')}</Text>
             <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/(tabs)/map')}>
-              <Text style={styles.viewAllText}>{t('profile.viewOnMap')}</Text>
+              <Text style={[styles.viewAllText, { color: colors.primary }]}>{t('profile.viewOnMap')}</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity
@@ -506,14 +535,14 @@ export default function ProfileScreen() {
         {/* ═══════════════════════════════════════════════════ */}
         {/* ACTIVITY FEED                                      */}
         {/* ═══════════════════════════════════════════════════ */}
-        <View style={styles.sectionContainer}>
+        <View style={[styles.sectionContainer, { backgroundColor: colors.background } ]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t('profile.recentActivity')}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('profile.recentActivity')}</Text>
           </View>
-          <View style={styles.activityCard}>
+          <View style={[styles.activityCard, { backgroundColor: colors.card } ]}>
             {mockActivities.map((activity, index) => (
               <React.Fragment key={activity.id}>
-                <ActivityItem activity={activity} />
+                <ActivityItem activity={activity} colors={colors} />
                 {index < mockActivities.length - 1 && <View style={styles.activityDivider} />}
               </React.Fragment>
             ))}
@@ -602,7 +631,7 @@ const styles = StyleSheet.create({
 
   // ─── Banner ───
   bannerContainer: {
-    width: SCREEN_WIDTH,
+    width: '100%',
     height: BANNER_HEIGHT,
     overflow: 'hidden',
   },
@@ -801,6 +830,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base,
     paddingTop: Spacing.lg,
   },
+  rewardsEntry: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border },
+  rewardsEntryIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  rewardsEntryText: { flex: 1, gap: 3 },
+  rewardsEntryTitle: { fontFamily: Fonts.semiBold, fontSize: FontSizes.md, color: Colors.textPrimary },
+  rewardsEntrySubtitle: { fontFamily: Fonts.regular, fontSize: FontSizes.sm, color: Colors.textSecondary },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -822,13 +856,16 @@ const styles = StyleSheet.create({
 
   // ─── Stats Grid ───
   statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
     marginTop: 2,
   },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   statCard: {
-    width: (SCREEN_WIDTH - 32 - 12) / 2,
+    flex: 1,
+    minWidth: 0,
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.md,
     padding: 16,

@@ -1,5 +1,5 @@
 import { Platform, StyleSheet } from 'react-native';
-import { Fonts, FontSizes } from './index';
+import { Fonts, FontSizes } from './Fonts';
 
 // ─── Auth Design Tokens (from Figma) ────────────────────────────────────────
 export const AuthColors = {

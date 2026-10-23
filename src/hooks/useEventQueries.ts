@@ -17,6 +17,7 @@ export const useEvents = (filters?: Record<string, unknown>) => {
   return useQuery({
     queryKey: queryKeys.events.list(filters),
     queryFn: () => eventService.getAll(filters),
+    retry: 1,
   });
 };
 

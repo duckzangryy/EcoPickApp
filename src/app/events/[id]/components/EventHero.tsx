@@ -4,6 +4,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../../../../constants';
 import { useTranslation } from 'react-i18next';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 
 interface EventHeroProps {
   event: any; // We use any for now or infer
@@ -12,9 +14,10 @@ interface EventHeroProps {
 
 export default function EventHero({ event, onOpenMaps }: EventHeroProps) {
   const { t } = useTranslation();
+  const colors = getColors(useThemeStore((state) => state.theme));
 
   return (
-    <View style={s.mapPreviewContainer}>
+    <View style={[s.mapPreviewContainer, { backgroundColor: colors.card, borderColor: colors.border }]} >
       <Image
         source={{
           uri:
@@ -37,9 +40,9 @@ export default function EventHero({ event, onOpenMaps }: EventHeroProps) {
           <Text style={s.routeText}>{event.status.toUpperCase()}</Text>
         </View>
       )}
-      <TouchableOpacity style={s.openMapsBtn} activeOpacity={0.8} onPress={onOpenMaps}>
-        <Ionicons name="open-outline" size={10.5} color={Colors.primary} />
-        <Text style={s.openMapsText}>{t('eventDetail.openMaps')}</Text>
+      <TouchableOpacity style={[s.openMapsBtn, { backgroundColor: colors.card }]} activeOpacity={0.8} onPress={onOpenMaps}>
+        <Ionicons name="open-outline" size={10.5} color={colors.primary} />
+        <Text style={[s.openMapsText, { color: colors.primary }]}>{t('eventDetail.openMaps')}</Text>
       </TouchableOpacity>
     </View>
   );

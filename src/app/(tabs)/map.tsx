@@ -2,20 +2,22 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, Alert, DeviceEventEmitter, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import { ActivityIndicator, Alert, DeviceEventEmitter, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from 'react-i18next';
 import Toast from 'react-native-toast-message';
+import { ENV } from '@/config/env';
 import type { Report } from '../../api/services/reportService';
 import { ReportsBottomSheet, SearchBar, SeverityChip } from '../../components';
-import type { MarkerPreviewSheetRef } from '../../components/map';
-import { FilterSheet, SearchOverlay } from '../../components/map';
-import { BorderRadius, Colors, Fonts, FontSizes, Spacing } from '../../constants';
+import { FilterSheet, MarkerPreviewSheet, SearchOverlay, type MarkerPreviewSheetRef } from '../../components/map';
+import { BorderRadius, Colors, Fonts, FontSizes, getColors, Spacing } from '../../constants';
+import { useLayout } from '@/hooks/use-layout';
 import { INITIAL_REGION, SEVERITY_FILTERS, type SeverityLevel, type WasteReport } from '../../data/mockData';
 import { useReports } from '../../hooks/useReportQueries';
 import { useMapStore } from '../../stores/mapStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { formatDistanceInfo, formatRouteInfo } from '../../utils/distance';
 
 // ─── Marker Design Config ───────────────────────────────────────────
@@ -95,25 +97,45 @@ const CUSTOM_MAP_STYLE = [
 ];
 
 // ─── Custom Marker Component ────────────────────────────────────────
-const CustomMarkerView = React.memo(({ severity }: { severity: SeverityLevel }) => {
+const CustomMarkerView = React.memo(({ severity, image }: { severity: SeverityLevel; image?: string }) => {
   const theme = MARKER_THEMES[severity];
+  const [imgErr, setImgErr] = React.useState(false);
+  const showImage = Boolean(image && !imgErr);
+
   return (
     <View style={markerStyles.wrapper}>
       {/* Glow */}
       <View style={[markerStyles.glow, { backgroundColor: theme.glow }]} />
 
-      {/* Circle + Icon */}
-      <View style={[markerStyles.circle, { backgroundColor: theme.bg, borderColor: theme.border }]}>
-        <Ionicons
-          name={theme.icon as keyof typeof Ionicons.glyphMap}
-          size={17}                    // giảm nhẹ từ 18 → 17 để an toàn hơn trên Android
-          color="#FFFFFF"
-          style={markerStyles.icon}    // đảm bảo zIndex
-        />
+      {/* Circle + Photo Thumbnail or Icon */}
+      <View
+        style={[
+          markerStyles.circle,
+          {
+            backgroundColor: showImage ? '#FFFFFF' : theme.bg,
+            borderColor: theme.border,
+          },
+        ]}
+      >
+        {showImage ? (
+          <Image
+            source={{ uri: image }}
+            style={markerStyles.photo}
+            resizeMode="cover"
+            onError={() => setImgErr(true)}
+          />
+        ) : (
+          <Ionicons
+            name={theme.icon as keyof typeof Ionicons.glyphMap}
+            size={18}
+            color="#FFFFFF"
+            style={markerStyles.icon}
+          />
+        )}
       </View>
 
       {/* Pointer (đuôi marker) */}
-      <View style={[markerStyles.pointer, { borderTopColor: theme.bg }]} />
+      <View style={[markerStyles.pointer, { borderTopColor: theme.border }]} />
     </View>
   );
 });
@@ -124,25 +146,23 @@ const markerStyles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    // width: 10,          // tăng nhẹ để có khoảng thở
-    // height: 10,         // tăng nhẹ để glow + pointer không bị cắt
     backgroundColor: 'transparent',
-    overflow: 'visible', // ← FIX QUAN TRỌNG trên Android
+    overflow: 'visible',
   },
 
   glow: {
     position: 'absolute',
-    top: -4,            // điều chỉnh nhẹ để glow cân đối hơn
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    top: -4,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     opacity: 0.6,
   },
 
   circle: {
-    width: 42,          // tăng từ 40 → 42 để icon có thêm không gian
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
@@ -151,11 +171,17 @@ const markerStyles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 8,
-    overflow: 'visible', // ← FIX QUAN TRỌNG trên Android
+    overflow: 'hidden',
+  },
+
+  photo: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
 
   icon: {
-    zIndex: 2,          // đảm bảo icon luôn ở trên cùng
+    zIndex: 2,
   },
 
   pointer: {
@@ -166,7 +192,7 @@ const markerStyles = StyleSheet.create({
     borderTopWidth: 11,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    marginTop: -3,      // điều chỉnh overlap mượt hơn
+    marginTop: -3,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -190,6 +216,7 @@ const API_SEVERITY_TO_UI: Record<string, SeverityLevel> = {
 };
 
 function transformReportToWasteReport(r: Report): WasteReport {
+  const photoUrl = r.report_img || (r as any).thumb || (r as any).image_url || (Array.isArray((r as any).photo_urls) && (r as any).photo_urls[0]) || '';
   return {
     id: r.id,
     title: r.location || r.title || (r.address as string | undefined) || `Report #${r.id.slice(0, 6)}`,
@@ -200,7 +227,7 @@ function transformReportToWasteReport(r: Report): WasteReport {
     distance: '',
     latitude: r.latitude || 0,
     longitude: r.longitude || 0,
-    image: r.report_img || '',
+    image: photoUrl,
     createdAt: r.created_at || new Date().toISOString(),
     upvotes: 0,
     comments: 0,
@@ -211,11 +238,14 @@ function transformReportToWasteReport(r: Report): WasteReport {
 // ─── Main MapScreen ─────────────────────────────────────────────────
 export default function MapScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ destLat?: string; destLng?: string; destTitle?: string }>();
+  const params = useLocalSearchParams<{ destLat?: string; destLng?: string; destTitle?: string; focusLat?: string; focusLng?: string }>();
   const insets = useSafeAreaInsets();
+  const { bottomTabHeight } = useLayout();
   const mapRef = useRef<MapView>(null);
   const markerSheetRef = useRef<MarkerPreviewSheetRef>(null);
   const { t } = useTranslation();
+  const themeMode = useThemeStore((s) => s.theme);
+  const colors = getColors(themeMode);
 
   // ── Zustand Store ──
   const {
@@ -254,6 +284,9 @@ export default function MapScreen() {
   // ── User Location ──
   const [userLocation, setUserLocation] = React.useState<Location.LocationObject | null>(null);
 
+  // ── Marker rendering lifecycle for remote photo thumbnails ──
+  const [tracksViewChanges, setTracksViewChanges] = React.useState(true);
+
   // ── Fetch reports from API ──
   const { data: apiReports = [], refetch: refetchReports } = useReports();
   useFocusEffect(
@@ -289,6 +322,15 @@ export default function MapScreen() {
     });
   }, [reportsWithDistance, filters]);
 
+  // Allow tracksViewChanges to render remote images, then turn off for performance
+  useEffect(() => {
+    setTracksViewChanges(true);
+    const timer = setTimeout(() => {
+      setTracksViewChanges(false);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [filteredReports]);
+
   // Filter count for FilterSheet apply button
   const filterMatchCount = filteredReports.length;
 
@@ -319,6 +361,19 @@ export default function MapScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.destLat, params.destLng, params.destTitle, userLocation]);
 
+  // ── Vừa gửi báo cáo: chỉ di chuyển bản đồ tới vị trí ảnh, không tính đường đi ──
+  useEffect(() => {
+    const lat = parseFloat(params.focusLat || '');
+    const lng = parseFloat(params.focusLng || '');
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    mapRef.current?.animateToRegion(
+      { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+      800,
+    );
+    router.setParams({ focusLat: '', focusLng: '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.focusLat, params.focusLng]);
+
   // ── Route Calculation ──
   const calculateRoute = useCallback(
     async (startLat: number, startLng: number, destLat: number, destLng: number, title: string) => {
@@ -326,7 +381,7 @@ export default function MapScreen() {
 
       try {
         const response = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson`,
+          `${ENV.OSRM_ROUTER_URL}/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson`,
         );
         const data = await response.json();
 
@@ -435,6 +490,78 @@ export default function MapScreen() {
     [router],
   );
 
+  const handleMarkerClick = useCallback(
+    (report: WasteReport) => {
+      selectMarker(report);
+      if (mapRef.current) {
+        mapRef.current.animateToRegion(
+          {
+            latitude: report.latitude,
+            longitude: report.longitude,
+            latitudeDelta: 0.012,
+            longitudeDelta: 0.012,
+          },
+          400,
+        );
+      }
+      setTimeout(() => {
+        markerSheetRef.current?.show(report);
+      }, 50);
+    },
+    [selectMarker],
+  );
+
+  // ── Web postMessage bridge from Leaflet map ──
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = event.data;
+        if (!data || typeof data !== 'object') return;
+
+        if (data.type === 'ECOPICK_SELECT_REPORT') {
+          const reportId = String(data.reportId || '');
+          let targetReport = reportsWithDistance.find((r) => String(r.id) === reportId);
+          if (!targetReport && data.photo) {
+            const p = data.photo;
+            targetReport = {
+              id: String(p.id || reportId),
+              title: p.title || p.name || `Báo cáo #${String(reportId).slice(0, 6)}`,
+              description: p.exif?.model ? `Thiết bị: ${p.exif.model}` : '',
+              severity: 'medium',
+              wasteTypes: [],
+              status: 'reported',
+              distance: '',
+              latitude: Number(p.lat) || 0,
+              longitude: Number(p.lng) || 0,
+              image: p.thumb || '',
+              createdAt: p.exif?.datetime || new Date().toISOString(),
+              upvotes: 0,
+              comments: 0,
+              reporterName: p.userid || p.name || 'Anonymous',
+            };
+          }
+          if (targetReport) {
+            selectMarker(targetReport);
+            markerSheetRef.current?.show(targetReport);
+          }
+        } else if (data.type === 'ECOPICK_VIEW_REPORT') {
+          if (data.reportId) {
+            router.push(`/location/${data.reportId}`);
+          }
+        }
+      } catch (err) {
+        console.warn('Error handling postMessage from map:', err);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [reportsWithDistance, selectMarker, router]);
+
 
   const handleNavigateReport = useCallback(
     (report: WasteReport) => {
@@ -456,10 +583,14 @@ export default function MapScreen() {
 
   const handleViewReport = useCallback(
     (report: WasteReport) => {
-      router.push(`/location/${report.id}`);
+      handleMarkerClick(report);
     },
-    [router],
+    [handleMarkerClick],
   );
+  const handleFocusDakLak = useCallback(() => {
+    mapRef.current?.animateToRegion(INITIAL_REGION, 1000);
+  }, []);
+
   const handleMyLocation = useCallback(async () => {
     try {
       if (userLocation && mapRef.current) {
@@ -515,18 +646,26 @@ export default function MapScreen() {
   const renderMap = () => (
     <MapView
       ref={mapRef}
+      provider={PROVIDER_GOOGLE}
+      mapType="none"
       style={StyleSheet.absoluteFillObject}
       initialRegion={INITIAL_REGION}
-      showsUserLocation
+      scrollEnabled
+      zoomEnabled
+      rotateEnabled
+      pitchEnabled
+      toolbarEnabled={false}
+      moveOnMarkerPress={false}
+      showsUserLocation={!!userLocation}
       showsMyLocationButton={false}
       showsCompass={false}
       showsPointsOfInterest={false}
       showsBuildings={false}
       showsIndoors={false}
       showsTraffic={false}
-      customMapStyle={CUSTOM_MAP_STYLE}
       mapPadding={{ top: 0, right: 0, bottom: 0, left: 0 }}
-      onPress={() => {
+      onPress={(e) => {
+        if (e?.nativeEvent?.action === 'marker-press') return;
         // Dismiss marker preview when tapping map
         if (selectedMarker) {
           selectMarker(null);
@@ -534,6 +673,14 @@ export default function MapScreen() {
         }
       }}
     >
+      {/* Raster tile overlay as dependable fallback (renders worldwide including Korea) */}
+      <UrlTile
+        urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+        maximumZ={19}
+        flipY={false}
+        zIndex={1}
+      />
+
       {/* Waste Report Markers */}
       {filteredReports
         .filter((m) => m.latitude && m.longitude)
@@ -541,11 +688,14 @@ export default function MapScreen() {
           <Marker
             key={marker.id}
             coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
-            onPress={() => handleViewDetails(marker)}
-            tracksViewChanges={false}
+            onPress={(e) => {
+              e?.stopPropagation?.();
+              handleMarkerClick(marker);
+            }}
+            tracksViewChanges={tracksViewChanges}
             anchor={{ x: 0.5, y: 1 }}
           >
-            <CustomMarkerView severity={marker.severity} />
+            <CustomMarkerView severity={marker.severity} image={marker.image} />
           </Marker>
         ))}
 
@@ -572,21 +722,21 @@ export default function MapScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
 
       {/* Map */}
       {renderMap()}
 
       {/* Routing Banner Overlay */}
       {isRouting && routeInfo && (
-        <View style={[styles.routingBanner, { top: insets.top + 16 }]}>
+        <View style={[styles.routingBanner, { top: insets.top + 16, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
           <View style={styles.routingInfo}>
             <View style={styles.routingIconBg}>
               <Ionicons name="navigate" size={18} color={Colors.primary} />
             </View>
             <View style={styles.routingTextContainer}>
-              <Text style={styles.routingLabel}>{t('map.routingLabel')}</Text>
-              <Text style={styles.routingText} numberOfLines={1}>
+              <Text style={[styles.routingLabel, { color: colors.textSecondary }]}>{t('map.routingLabel')}</Text>
+              <Text style={[styles.routingText, { color: colors.textPrimary }]} numberOfLines={1}>
                 {routeInfo.destTitle}
               </Text>
               <View style={styles.routeStatsRow}>
@@ -623,14 +773,14 @@ export default function MapScreen() {
 
       {/* Top overlay — Search + Severity Chips (hide when routing) */}
       {!isRouting && (
-        <View style={[styles.topOverlay, { paddingTop: insets.top + 24 }]}>
+        <View style={[styles.topOverlay, { paddingTop: insets.top + 24 }]} pointerEvents="box-none">
           <SearchBar
             value={searchQuery}
             onChangeText={setSearchQuery}
             onFilterPress={handleFilterPress}
             onFocus={handleSearchFocus}
           />
-          <View style={styles.filtersRow}>
+          <View style={styles.filtersRow} pointerEvents="box-none">
             {SEVERITY_FILTERS.map((filter) => (
               <SeverityChip
                 key={filter.key}
@@ -645,23 +795,39 @@ export default function MapScreen() {
       )}
 
       {/* Floating buttons */}
-      <View style={[styles.floatingButtons, isRouting && { bottom: 32 }]}>
-        <TouchableOpacity style={styles.locationButton} onPress={handleMyLocation} activeOpacity={0.7}>
+      <View style={[styles.floatingButtons, { bottom: isRouting ? insets.bottom + 32 : bottomTabHeight + 160 }]} pointerEvents="box-none">
+        <TouchableOpacity
+          style={[styles.locationButton, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 10 }]}
+          onPress={handleFocusDakLak}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="map-outline" size={20} color={Colors.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.locationButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={handleMyLocation}
+          activeOpacity={0.7}
+        >
           <Ionicons name="locate" size={22} color={Colors.primary} />
         </TouchableOpacity>
       </View>
 
       {/* Bottom Sheet — Reports List (hide when routing or marker selected) */}
       {!isRouting && !selectedMarker && (
-        <View style={[StyleSheet.absoluteFillObject, { zIndex: 999, elevation: 999 }]} pointerEvents="box-none">
-          <ReportsBottomSheet
-            reports={filteredReports}
-            totalCount={filteredReports.length}
-            onNavigateReport={handleNavigateReport}
-            onViewReport={handleViewReport}
-          />
-        </View>
+        <ReportsBottomSheet
+          reports={filteredReports}
+          totalCount={filteredReports.length}
+          onNavigateReport={handleNavigateReport}
+          onViewReport={handleViewReport}
+        />
       )}
+
+      <MarkerPreviewSheet
+        ref={markerSheetRef}
+        onViewDetails={handleViewDetails}
+        onGetDirections={(report) => handleNavigateReport(report)}
+        onDismiss={() => selectMarker(null)}
+      />
 
       {/* Search Overlay */}
       <SearchOverlay
@@ -677,20 +843,22 @@ export default function MapScreen() {
       />
 
       {/* Filter Sheet */}
-      <View style={[StyleSheet.absoluteFillObject, { zIndex: 1100, elevation: 1100 }]} pointerEvents="box-none">
-        <FilterSheet
-          visible={isFilterSheetOpen}
-          filters={filters}
-          onToggleSeverity={toggleSeverityFilter}
-          onToggleWasteType={toggleWasteTypeFilter}
-          onToggleStatus={toggleStatusFilter}
-          onDistanceChange={setDistanceRange}
-          onApply={handleFilterApply}
-          onReset={handleFilterReset}
-          onClose={handleFilterClose}
-          matchCount={filterMatchCount}
-        />
-      </View>
+      {isFilterSheetOpen && (
+        <View style={[StyleSheet.absoluteFillObject, { zIndex: 1100, elevation: 1100 }]} pointerEvents="box-none">
+          <FilterSheet
+            visible={isFilterSheetOpen}
+            filters={filters}
+            onToggleSeverity={toggleSeverityFilter}
+            onToggleWasteType={toggleWasteTypeFilter}
+            onToggleStatus={toggleStatusFilter}
+            onDistanceChange={setDistanceRange}
+            onApply={handleFilterApply}
+            onReset={handleFilterReset}
+            onClose={handleFilterClose}
+            matchCount={filterMatchCount}
+          />
+        </View>
+      )}
     </View>
   );
 }

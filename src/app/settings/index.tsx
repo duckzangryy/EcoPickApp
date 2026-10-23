@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { BorderRadius, Colors, Fonts, FontSizes, LineHeights, Spacing } from '../../constants';
 import { setLanguage } from '../../i18n';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 
 import SectionHeader from './components/SectionHeader';
 import SettingNavRow from './components/SettingNavRow';
@@ -39,6 +41,9 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const currentLanguage = i18n.language;
+  const theme = useThemeStore((s) => s.theme);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
+  const colors = getColors(theme);
 
   // Toggle states
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -79,37 +84,49 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
 
       {/* ─── Header ─── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }] }>
         <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={20} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('settings.title')}</Text>
         <View style={styles.headerPlaceholder} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} style={{ backgroundColor: colors.background }}>
 
         {/* ═══ Language Section ═══ */}
         <View style={styles.section}>
+          <SectionHeader icon="contrast-outline" title="Giao diện" description="Tùy chỉnh chế độ hiển thị EcoPick" />
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <SettingToggleRow
+              icon={theme === 'dark' ? 'moon-outline' : 'sunny-outline'}
+              label={theme === 'dark' ? 'Chế độ tối' : 'Chế độ sáng'}
+              value={theme === 'dark'}
+              onToggle={toggleTheme}
+              isLast
+            />
+          </View>
+        </View>
+        <View style={styles.section}>
           <SectionHeader icon="language-outline" title={t('settings.language')} />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {LANGUAGES.map((lang, index) => {
               const isSelected = currentLanguage === lang.code;
               const isLast = index === LANGUAGES.length - 1;
               return (
                 <TouchableOpacity
                   key={lang.code}
-                  style={[styles.languageRow, !isLast && styles.settingRowBorder]}
+                  style={[styles.languageRow, { backgroundColor: colors.card, borderBottomColor: colors.border }, !isLast && styles.settingRowBorder]}
                   onPress={() => handleLanguageChange(lang.code)}
                   activeOpacity={0.6}
                 >
                   <View style={styles.languageLeft}>
                     <Text style={styles.languageFlag}>{lang.flag}</Text>
-                    <Text style={[styles.languageLabel, isSelected && styles.languageLabelActive]}>
+                    <Text style={[styles.languageLabel, { color: isSelected ? colors.primary : colors.textPrimary }]}>
                       {lang.label}
                     </Text>
                   </View>
@@ -131,7 +148,7 @@ export default function SettingsScreen() {
             title={t('settings.notifications')}
             description={t('settings.notificationsDesc')}
           />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border } ]}>
             <SettingToggleRow
               icon="push-outline"
               label={t('settings.pushNotifications')}
@@ -167,7 +184,7 @@ export default function SettingsScreen() {
             title={t('settings.mapPreferences')}
             description={t('settings.mapPreferencesDesc')}
           />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border } ]}>
             <SettingToggleRow
               icon="flag-outline"
               label={t('settings.showReportMarkers')}
@@ -197,7 +214,7 @@ export default function SettingsScreen() {
             title={t('settings.privacy')}
             description={t('settings.privacyDesc')}
           />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border } ]}>
             <SettingToggleRow
               icon="location-outline"
               label={t('settings.shareLocation')}
@@ -227,7 +244,7 @@ export default function SettingsScreen() {
             title={t('settings.helpSupport')}
             description={t('settings.helpSupportDesc')}
           />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border } ]}>
             <SettingNavRow
               icon="chatbubble-ellipses-outline"
               label={t('settings.faq')}
@@ -259,7 +276,7 @@ export default function SettingsScreen() {
             title={t('settings.account')}
             description={t('settings.accountDesc')}
           />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border } ]}>
             <SettingNavRow
               icon="create-outline"
               label={t('settings.editProfile')}
@@ -284,7 +301,7 @@ export default function SettingsScreen() {
         {/* ═══ About Section ═══ */}
         <View style={styles.section}>
           <SectionHeader icon="information-circle-outline" title={t('settings.about')} />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border } ]}>
             <View style={styles.aboutRow}>
               <Text style={styles.aboutLabel}>{t('settings.version')}</Text>
               <View style={styles.versionBadge}>

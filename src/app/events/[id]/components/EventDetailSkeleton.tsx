@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { Colors } from '../../../../constants';
-
-const SHIMMER_COLOR = '#E8ECF0';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 
 function useShimmer() {
   const opacity = useRef(new Animated.Value(0.4)).current;
@@ -22,10 +21,12 @@ function useShimmer() {
 /** Reusable shimmer block */
 function Bone({ style }: { style?: any }) {
   const opacity = useShimmer();
-  return <Animated.View style={[s.bone, style, { opacity }]} />;
+  const colors = getColors(useThemeStore((state) => state.theme));
+  return <Animated.View style={[s.bone, { opacity, backgroundColor: colors.border }, style]} />;
 }
 
 export default function EventDetailSkeleton() {
+  const colors = getColors(useThemeStore((state) => state.theme));
   return (
     <View style={s.container}>
       {/* ─── Hero image ─── */}
@@ -85,13 +86,13 @@ export default function EventDetailSkeleton() {
                 key={idx}
                 style={[
                   s.avatar,
-                  { marginLeft: idx > 0 ? -12 : 0 },
+                  { marginLeft: idx > 0 ? -12 : 0, borderColor: colors.background },
                 ]}
               />
             ))}
-            <Bone style={[s.avatar, { marginLeft: -12, backgroundColor: '#DCE3E8' }]} />
+            <Bone style={[s.avatar, { marginLeft: -12, backgroundColor: colors.borderMedium, borderColor: colors.background }]} />
           </View>
-          <View style={s.rsvpDivider} />
+          <View style={[s.rsvpDivider, { backgroundColor: colors.border }]} />
           <View style={{ gap: 6 }}>
             <Bone style={{ width: 60, height: 10 }} />
             <Bone style={{ width: 40, height: 12 }} />
@@ -100,7 +101,7 @@ export default function EventDetailSkeleton() {
       </View>
 
       {/* ─── Equipment section ─── */}
-      <View style={s.equipmentCard}>
+      <View style={[s.equipmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {/* Header */}
         <View style={s.typeRow}>
           <Bone style={{ width: 20, height: 20, borderRadius: 10 }} />
@@ -109,7 +110,7 @@ export default function EventDetailSkeleton() {
 
         {/* Equipment rows */}
         {[0, 1, 2].map((idx) => (
-          <View key={idx} style={s.equipmentRow}>
+          <View key={idx} style={[s.equipmentRow, { backgroundColor: colors.background }]}>
             <View style={s.typeRow}>
               <Bone style={{ width: 20, height: 20, borderRadius: 10 }} />
               <Bone style={{ width: 90 + idx * 20, height: 14 }} />
@@ -129,7 +130,6 @@ const s = StyleSheet.create({
     gap: 24,
   },
   bone: {
-    backgroundColor: SHIMMER_COLOR,
     borderRadius: 8,
   },
 
@@ -192,22 +192,18 @@ const s = StyleSheet.create({
     height: 40,
     borderRadius: 9999,
     borderWidth: 2,
-    borderColor: '#F6F8F7',
   },
   rsvpDivider: {
     width: 1,
     height: 32,
-    backgroundColor: '#E2E8F0',
     marginHorizontal: 16,
   },
 
   // ─── Equipment ───
   equipmentCard: {
     marginHorizontal: 16,
-    backgroundColor: Colors.white,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     padding: 17,
     gap: 12,
   },
@@ -215,7 +211,6 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F6F8F7',
     padding: 8,
     borderRadius: 16,
   },

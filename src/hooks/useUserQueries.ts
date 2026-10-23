@@ -2,15 +2,19 @@ import { queryKeys } from "@/api/queryKeys";
 import {
 	authService,
 	userService,
+	type ForgotPasswordPayload,
+	type RegisterPayload,
+	type ResetPasswordPayload,
 	type SignInPayload,
 	type SignUpPayload,
 	type UpdateUserPayload,
+	type VerifyEmailPayload,
 } from "@/api/services/userService";
 import { useAuthStore } from "@/stores/authStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ============================================================
-// Auth Mutations
+// Auth Mutations (04-BACKEND-API.md Section 3.1)
 // ============================================================
 
 /** Đăng nhập → lưu token + fetch userInfo → lưu vào store */
@@ -21,29 +25,56 @@ export const useSignIn = () => {
 		mutationFn: async (payload: SignInPayload) => {
 			// 1. Đăng nhập lấy token
 			const authResponse = await authService.signIn(payload);
+			const token = authResponse.access_token || authResponse.accessToken || '';
+			const refreshToken = authResponse.refresh_token || authResponse.refreshToken || '';
 
 			// 2. Lưu token tạm để axios interceptor gắn vào header mà CHƯA kích hoạt isAuthenticated
-			useAuthStore.getState().setToken(authResponse.access_token, authResponse.refresh_token);
+			useAuthStore.getState().setToken(token, refreshToken);
+
+			if (!token || token.startsWith('mock_')) throw new Error('API không cấp token đăng nhập hợp lệ');
 
 			// 3. Fetch userInfo đầy đủ (bây giờ axios đã có token)
-			const userInfo = await userService.getUserInfo();
+			const userInfo = authResponse.user || await userService.getUserInfo();
+			if (!userInfo?.id) throw new Error('API không trả thông tin tài khoản hợp lệ');
 
 			// 4. Kích hoạt auth chính thức (sẽ set isAuthenticated = true và trigger NavigationGuard)
-			useAuthStore.getState().setAuth(authResponse.access_token, authResponse.refresh_token, userInfo);
+			useAuthStore.getState().setAuth(token, refreshToken, userInfo);
 
 			return { auth: authResponse, user: userInfo };
 		},
 		onSuccess: () => {
-			// Invalidate toàn bộ cache thay vì clear hoàn toàn
 			queryClient.invalidateQueries();
 		},
 	});
 };
 
-/** Đăng ký */
+/** Đăng ký tài khoản */
 export const useSignUp = () => {
 	return useMutation({
-		mutationFn: (payload: SignUpPayload) => authService.signUp(payload),
+		mutationFn: (payload: SignUpPayload | RegisterPayload) => authService.signUp(payload),
+	});
+};
+
+export const useRegister = useSignUp;
+
+/** Xác thực email bằng OTP */
+export const useVerifyEmail = () => {
+	return useMutation({
+		mutationFn: (payload: VerifyEmailPayload) => authService.verifyEmail(payload),
+	});
+};
+
+/** Quên mật khẩu - gửi mã xác nhận */
+export const useForgotPassword = () => {
+	return useMutation({
+		mutationFn: (payload: ForgotPasswordPayload) => authService.forgotPassword(payload),
+	});
+};
+
+/** Đặt lại mật khẩu với token/OTP */
+export const useResetPassword = () => {
+	return useMutation({
+		mutationFn: (payload: ResetPasswordPayload) => authService.resetPassword(payload),
 	});
 };
 
@@ -53,6 +84,7 @@ export const useSignOut = () => {
 
 	return useMutation({
 		mutationFn: async () => {
+			await authService.logout();
 			useAuthStore.getState().logout();
 		},
 		onSuccess: () => {
@@ -62,10 +94,10 @@ export const useSignOut = () => {
 };
 
 // ============================================================
-// User Queries
+// User Queries (04-BACKEND-API.md Section 3.2)
 // ============================================================
 
-/** Lấy thông tin user hiện tại – GET /api/users/userinfo/ */
+/** Lấy thông tin user hiện tại – GET /api/v1/users/me */
 export const useUserInfo = () => {
 	const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
@@ -73,8 +105,24 @@ export const useUserInfo = () => {
 		queryKey: queryKeys.users.userInfo(),
 		queryFn: () => userService.getUserInfo(),
 		enabled: isAuthenticated,
-		staleTime: 5 * 60 * 1000, // 5 phút – ngăn refetch ngầm gây mất focus input
+		staleTime: 5 * 60 * 1000,
 		refetchOnWindowFocus: false,
+	});
+};
+
+/** Lấy thống kê user – GET /api/v1/users/:id/stats */
+export const useUserStats = (id: string = 'me') => {
+	return useQuery({
+		queryKey: ['users', 'stats', id],
+		queryFn: () => userService.getUserStats(id),
+	});
+};
+
+/** Lấy lịch sử hoạt động – GET /api/v1/users/:id/activity */
+export const useUserActivity = (id: string = 'me') => {
+	return useQuery({
+		queryKey: ['users', 'activity', id],
+		queryFn: () => userService.getUserActivity(id),
 	});
 };
 
@@ -90,7 +138,7 @@ export const useUsers = (filters?: Record<string, unknown>) => {
 // User Mutations
 // ============================================================
 
-/** Cập nhật user – PATCH /api/users/{id}/ */
+/** Cập nhật user – PATCH /api/v1/users/me */
 export const useUpdateUser = () => {
 	const queryClient = useQueryClient();
 
@@ -99,12 +147,12 @@ export const useUpdateUser = () => {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
 		},
-		onError: (error) => {
+		onError: (error: any) => {
 			const errorMsg =
+				error?.response?.data?.error?.message ||
 				error?.response?.data?.detail ||
-				error?.response?.data?.error ||
 				error?.message ||
-				"Đăng nhập thất bại. Vui lòng kiểm tra lại.";
+				"Cập nhật thông tin thất bại.";
 			console.log("UPDATE PROFILE ERROR:", errorMsg);
 		},
 	});

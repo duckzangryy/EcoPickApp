@@ -16,6 +16,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BorderRadius, Colors, FontSizes, Fonts, LineHeights, Spacing } from '../../../constants';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 
 // ─── Category config (same as list screen) ────────────────────────────────────
 const CATEGORY_META: Record<string, { label: string; icon: string; color: string; bg: string }> = {
@@ -26,7 +28,8 @@ const CATEGORY_META: Record<string, { label: string; icon: string; color: string
   default: { label: 'Khác', icon: 'ribbon', color: '#D97706', bg: 'rgba(217,119,6,0.1)' },
 };
 
-function getCategoryMeta(category: string) {
+function getCategoryMeta(category?: string) {
+  if (!category) return CATEGORY_META.default;
   return CATEGORY_META[category] ?? CATEGORY_META.default;
 }
 
@@ -64,7 +67,8 @@ const CATEGORY_STEPS: Record<string, { icon: string; title: string; desc: string
   ],
 };
 
-function getSteps(category: string) {
+function getSteps(category?: string) {
+  if (!category) return CATEGORY_STEPS.default;
   return CATEGORY_STEPS[category] ?? CATEGORY_STEPS.default;
 }
 
@@ -74,11 +78,13 @@ function StepItem({
   index,
   isLast,
   color,
+  colors,
 }: {
   step: { icon: string; title: string; desc: string };
   index: number;
   isLast: boolean;
   color: string;
+  colors: ReturnType<typeof getColors>;
 }) {
   return (
     <View style={s.stepRow}>
@@ -92,12 +98,12 @@ function StepItem({
 
       {/* Content */}
       <View style={[s.stepContent, !isLast && { marginBottom: Spacing.base }]}>
-        <View style={s.stepIconWrap}>
+        <View style={[s.stepIconWrap, { backgroundColor: colors.primaryLight } ]}>
           <Ionicons name={step.icon as any} size={16} color={color} />
         </View>
         <View style={s.stepTextWrap}>
-          <Text style={s.stepTitle}>{step.title}</Text>
-          <Text style={s.stepDesc}>{step.desc}</Text>
+          <Text style={[s.stepTitle, { color: colors.textPrimary }]}>{step.title}</Text>
+          <Text style={[s.stepDesc, { color: colors.textSecondary }]}>{step.desc}</Text>
         </View>
       </View>
     </View>
@@ -108,11 +114,12 @@ function StepItem({
 export default function BadgeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const theme = useThemeStore((s) => s.theme);
+  const colors = getColors(theme);
   const userId = useAuthStore((s) => s.user?.id);
 
   const { data: badge, isLoading, isError } = useBadge(id!);
   const { data: allUserBadges = [] } = useUserBadges();
-  // console.log('allUserBadges', allUserBadges);
 
   const earnersCount = useMemo(
     () => allUserBadges.filter((ub) => ub.badge_id === id).length,
@@ -127,11 +134,11 @@ export default function BadgeDetailScreen() {
   // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <SafeAreaView style={s.safeArea}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}>
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
         <View style={s.simpleHeader}>
           <TouchableOpacity style={s.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={20} color={Colors.textPrimary} />
+            <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
         <View style={s.loadingCenter}>
@@ -144,11 +151,11 @@ export default function BadgeDetailScreen() {
   // ── Error / Not Found state ────────────────────────────────────────────────
   if (isError || !badge) {
     return (
-      <SafeAreaView style={s.safeArea}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}>
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
         <View style={s.simpleHeader}>
           <TouchableOpacity style={s.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={20} color={Colors.textPrimary} />
+            <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
         <View style={s.loadingCenter}>
@@ -167,15 +174,15 @@ export default function BadgeDetailScreen() {
   const steps = getSteps(badge.category);
 
   return (
-    <SafeAreaView style={s.safeArea}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
 
       {/* ─── Header ─── */}
-      <View style={s.header}>
+      <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]} >
         <TouchableOpacity style={s.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={20} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>Chi tiết huy hiệu</Text>
+        <Text style={[s.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>Chi tiết huy hiệu</Text>
         <View style={s.headerBtn} />
       </View>
 
@@ -184,7 +191,7 @@ export default function BadgeDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ─── Hero Section ─── */}
-        <View style={s.heroBanner}>
+        <View style={[s.heroBanner, { backgroundColor: colors.card, borderColor: colors.border }]} >
           {/* Badge icon */}
           <View style={[s.heroIconWrap, { backgroundColor: isEarned ? meta.bg : 'rgba(148,163,184,0.1)' }]}>
             {badge.icon_url ? (
@@ -221,8 +228,8 @@ export default function BadgeDetailScreen() {
             </Text>
           </View>
 
-          <Text style={s.heroName}>{badge.name}</Text>
-          <Text style={s.heroDesc}>{badge.description}</Text>
+          <Text style={[s.heroName, { color: colors.textPrimary } ]}>{badge.name}</Text>
+          <Text style={[s.heroDesc, { color: colors.textSecondary } ]}>{badge.description}</Text>
 
           {/* Category tag */}
           <View style={[s.categoryTag, { backgroundColor: meta.bg }]}>
@@ -232,39 +239,39 @@ export default function BadgeDetailScreen() {
         </View>
 
         {/* ─── Stats Row ─── */}
-        <View style={s.statsRow}>
+        <View style={[s.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]} >
           <View style={s.statCard}>
             <Ionicons name="people-outline" size={20} color={Colors.primary} />
-            <Text style={s.statValue}>{earnersCount}</Text>
-            <Text style={s.statLabel}>Người nhận</Text>
+            <Text style={[s.statValue, { color: colors.textPrimary }]}>{earnersCount}</Text>
+            <Text style={[s.statLabel, { color: colors.textSecondary }]}>Người nhận</Text>
           </View>
 
-          <View style={s.statDivider} />
+          <View style={[s.statDivider, { backgroundColor: colors.border }]} />
 
           <View style={s.statCard}>
             <Ionicons name={isEarned ? 'trophy' : 'trophy-outline'} size={20} color={isEarned ? '#D97706' : '#CBD5E1'} />
-            <Text style={[s.statValue, !isEarned && { color: '#CBD5E1' }]}>
+            <Text style={[s.statValue, { color: isEarned ? colors.textPrimary : colors.textPlaceholder }]}>
               {isEarned ? '✓' : '—'}
             </Text>
-            <Text style={s.statLabel}>Của bạn</Text>
+            <Text style={[s.statLabel, { color: colors.textSecondary }]}>Của bạn</Text>
           </View>
 
-          <View style={s.statDivider} />
+          <View style={[s.statDivider, { backgroundColor: colors.border }]} />
 
           <View style={s.statCard}>
             <Ionicons name="pricetag-outline" size={20} color={meta.color} />
             <Text style={[s.statValue, { color: meta.color }]}>{meta.label}</Text>
-            <Text style={s.statLabel}>Danh mục</Text>
+            <Text style={[s.statLabel, { color: colors.textSecondary }]}>Danh mục</Text>
           </View>
         </View>
 
         {/* ─── How to earn ─── */}
-        <View style={s.card}>
+        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]} >
           <View style={s.cardHeader}>
             <Ionicons name="map-outline" size={18} color={Colors.primary} />
-            <Text style={s.cardTitle}>Cách nhận huy hiệu</Text>
+            <Text style={[s.cardTitle, { color: colors.textPrimary }]}>Cách nhận huy hiệu</Text>
           </View>
-          <Text style={s.cardSubtitle}>
+          <Text style={[s.cardSubtitle, { color: colors.textSecondary } ]}>
             Thực hiện các bước sau để mở khóa huy hiệu này
           </Text>
 
@@ -276,6 +283,7 @@ export default function BadgeDetailScreen() {
                 index={i}
                 isLast={i === steps.length - 1}
                 color={meta.color}
+                colors={colors}
               />
             ))}
           </View>
@@ -283,9 +291,9 @@ export default function BadgeDetailScreen() {
 
         {/* ─── Tip card (if not earned) ─── */}
         {!isEarned && (
-          <View style={s.tipCard}>
+          <View style={[s.tipCard, theme === 'dark' && { backgroundColor: 'rgba(217,119,6,0.14)', borderColor: 'rgba(217,119,6,0.32)' }]} >
             <Ionicons name="bulb-outline" size={18} color="#D97706" />
-            <Text style={s.tipText}>
+            <Text style={[s.tipText, { color: theme === 'dark' ? '#FCD34D' : '#92400E' } ]}>
               Bạn chưa sở hữu huy hiệu này. Hãy bắt đầu ngay bằng cách tham gia các hoạt động liên quan!
             </Text>
           </View>

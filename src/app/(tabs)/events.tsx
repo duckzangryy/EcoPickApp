@@ -18,6 +18,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Event } from '../../api/services/eventService';
 import { Colors, Fonts } from '../../constants';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { useEvents } from '../../hooks/useEventQueries';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -121,6 +124,8 @@ export default function EventsScreen() {
   const [activeTab, setActiveTab] = useState('upcoming');
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+  const theme = useThemeStore((s) => s.theme);
+  const colors = getColors(theme);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -131,7 +136,7 @@ export default function EventsScreen() {
   }, []);
 
   // ── Fetch events from API ──
-  const { data: apiEvents = [], isLoading, isRefetching, refetch } = useEvents();
+  const { data: apiEvents = [], isLoading, isRefetching, isError, refetch } = useEvents();
 
   // ── Handle Tab Press ──
   useEffect(() => {
@@ -171,7 +176,8 @@ export default function EventsScreen() {
 
   const renderEvent = useCallback(
     ({ item }: { item: Event }) => (
-      <TouchableOpacity style={styles.eventCard} onPress={() => handlePressCard(item)} activeOpacity={0.9}>
+      <Reanimated.View entering={FadeInDown.duration(280)}>
+      <TouchableOpacity style={[styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => handlePressCard(item)} activeOpacity={0.9}>
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: item.cover_image_url || DEFAULT_EVENT_IMAGE }}
@@ -186,12 +192,12 @@ export default function EventsScreen() {
         </View>
         <View style={styles.eventContent}>
           <View style={styles.textContent}>
-            <Text style={styles.eventTitle} numberOfLines={2}>
+            <Text style={[styles.eventTitle, { color: colors.textPrimary }]} numberOfLines={2}>
               {item.title}
             </Text>
             <View style={styles.eventDateContainer}>
-              <Ionicons name="calendar-outline" size={14} color={Colors.primary} />
-              <Text style={styles.eventDateText}>
+              <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+              <Text style={[styles.eventDateText, { color: colors.primary } ]}>
                 {formatEventDate(item.start_date)} • {formatEventTime(item.start_date)}
               </Text>
             </View>
@@ -200,53 +206,78 @@ export default function EventsScreen() {
           <View style={styles.eventFooterMargin}>
             <View style={styles.eventFooter}>
               <View style={styles.avatarsSection}>
-                <View style={styles.avatarsStack}>
-                  {AVATAR_IMAGES.map((uri, idx) => (
-                    <View key={idx} style={[styles.avatar, { zIndex: 3 - idx, marginLeft: idx > 0 ? -8 : 0 }]}>
-                      <Image source={{ uri }} style={styles.avatarImage} />
-                    </View>
-                  ))}
-                </View>
-                <Text style={styles.othersText}>{t('events.others', { count: item.current_paticipants || 0 })}</Text>
+                {(() => {
+                  const count = Number(item.current_paticipants ?? (item as any).current_participants ?? 0);
+                  if (count <= 0) {
+                    return (
+                      <>
+                        <View style={[styles.emptyAvatarBadge, { backgroundColor: colors.primaryLight }]}>
+                          <Ionicons name="people-outline" size={14} color={colors.primary} />
+                        </View>
+                        <Text style={[styles.othersText, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {t('eventDetail.noParticipants', { defaultValue: 'Chưa có người tham gia' })}
+                        </Text>
+                      </>
+                    );
+                  }
+                  const visibleAvatars = AVATAR_IMAGES.slice(0, Math.min(count, 3));
+                  return (
+                    <>
+                      <View style={styles.avatarsStack}>
+                        {visibleAvatars.map((uri, idx) => (
+                          <View key={idx} style={[styles.avatar, { zIndex: 3 - idx, marginLeft: idx > 0 ? -6 : 0 }]}>
+                            <Image source={{ uri }} style={styles.avatarImage} />
+                          </View>
+                        ))}
+                      </View>
+                      <Text style={[styles.othersText, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {count <= 3
+                          ? `${count} ${t('common.participants', { defaultValue: 'người tham gia' })}`
+                          : `+${count - 3} ${t('common.others', { defaultValue: 'người khác' })}`}
+                      </Text>
+                    </>
+                  );
+                })()}
               </View>
-              <TouchableOpacity style={styles.joinButton} onPress={() => handleJoinEvent(item)} activeOpacity={0.8}>
+              <TouchableOpacity style={[styles.joinButton, { backgroundColor: colors.primary }]} onPress={() => handleJoinEvent(item)} activeOpacity={0.8}>
                 <Text style={styles.joinButtonText}>{t('events.join')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </TouchableOpacity>
+      </Reanimated.View>
     ),
-    [handleJoinEvent, handlePressCard, user?.id, t],
+    [handleJoinEvent, handlePressCard, user?.id, t, colors.card, colors.border],
   );
   const {bottomTabHeight} = useLayout();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 16 : 0) }]}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 16 : 0), backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View style={styles.logoContainer}>
           <Image source={require('../../assets/logo.png')} style={styles.logo} />
         </View>
-        <Text style={styles.headerTitle}>{t('events.headerTitle')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('events.headerTitle')}</Text>
         <View style={styles.searchContainer}>
           <TouchableOpacity style={styles.searchButton}>
-            <Ionicons name="search" size={18} color="#0F172A" />
+            <Ionicons name="search" size={18} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Tabs */}
       <View style={styles.tabsWrapper}>
-        <View style={styles.tabsContainer}>
+        <View style={[styles.tabsContainer, { backgroundColor: colors.primaryLight }]}>
           {TAB_KEYS.map((tabKey) => (
             <TouchableOpacity
               key={tabKey}
-              style={[styles.tab, activeTab === tabKey && styles.activeTab]}
+              style={[styles.tab, activeTab === tabKey && [styles.activeTab, { backgroundColor: colors.card }]]}
               onPress={() => setActiveTab(tabKey)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.tabText, activeTab === tabKey && styles.activeTabText]}>
+              <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === tabKey && { color: colors.primary }]}>
                 {t(`events.${tabKey}`)}
               </Text>
             </TouchableOpacity>
@@ -283,8 +314,8 @@ export default function EventsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="calendar-outline" size={48} color="#94A3B8" />
-              <Text style={styles.emptyText}>{t('events.noEvents')}</Text>
+              <Ionicons name="calendar-outline" size={48} color={colors.textPlaceholder} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{isError ? 'Không tải được sự kiện. Kéo xuống để thử lại.' : t('events.noEvents')}</Text>
             </View>
           }
         />
@@ -458,24 +489,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
   },
   avatarsSection: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    marginRight: 6,
+    minWidth: 0,
   },
   avatarsStack: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: 8,
+    flexShrink: 0,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 9999,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: Colors.white,
     backgroundColor: '#E2E8F0',
     overflow: 'hidden',
+  },
+  emptyAvatarBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   avatarImage: {
     width: '100%',
@@ -487,13 +531,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     color: '#64748B',
-    marginLeft: 12,
+    flexShrink: 1,
   },
   joinButton: {
     backgroundColor: '#20693A',
-    paddingHorizontal: 24,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 9,
     borderRadius: 12,
+    flexShrink: 0,
   },
   joinButtonText: {
     color: Colors.white,

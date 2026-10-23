@@ -23,6 +23,9 @@
 
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import { extractGpsFromExif, ExifCoordinates } from './exif';
+
+export { extractGpsFromExif, ExifCoordinates } from './exif';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,6 +39,10 @@ export interface PickedImage {
   type: 'image/jpeg';
   /** File size in bytes (after compression) */
   size: number | undefined;
+  /** GPS coordinates extracted from photo EXIF metadata */
+  coordinates?: ExifCoordinates;
+  /** Raw EXIF metadata if available */
+  exif?: Record<string, unknown> | null;
   /**
    * Pre-built file object suitable for FormData.append().
    * Cast to `any` when appending: formData.append('key', file as any)
@@ -121,10 +128,10 @@ export async function pickImage(options: PickImageOptions = {}): Promise<PickIma
       allowsMultipleSelection,
       // selectionLimit only respected on iOS 14+
       selectionLimit: allowsMultipleSelection ? maxSelected : 1,
-      quality,
+      quality: 1,
       aspect: allowsEditing && aspect ? aspect : undefined,
-      // Keep EXIF for potential geo-tagging future use
-      exif: false,
+      // Enable EXIF extraction for geo-tagging
+      exif: true,
     });
   } catch (error) {
     return { success: false, reason: 'error', error };
@@ -150,6 +157,7 @@ export async function pickImage(options: PickImageOptions = {}): Promise<PickIma
         );
 
         const fileName = `photo_${timestamp}_${index}.jpg`;
+        const coordinates = extractGpsFromExif(asset.exif) ?? undefined;
 
         return {
           uri: manipulated.uri,
@@ -157,6 +165,8 @@ export async function pickImage(options: PickImageOptions = {}): Promise<PickIma
           type: 'image/jpeg' as const,
           // ImageManipulator doesn't expose size; use original if available
           size: asset.fileSize,
+          coordinates,
+          exif: asset.exif,
           file: {
             uri: manipulated.uri,
             name: fileName,

@@ -74,7 +74,6 @@ export default function CreateEventScreen() {
     if (params.address) setAddress(params.address);
     if (params.latitude) setLatitude(parseFloat(params.latitude));
     if (params.longitude) setLongitude(parseFloat(params.longitude));
-    console.log('Received location params:', params)
   }, [params.address, params.latitude, params.longitude]);
 
   const [selectedEquipment, setSelectedEquipment] = useState<Set<string>>(
@@ -190,20 +189,28 @@ export default function CreateEventScreen() {
     }
 
     try {
-      const manipulatedImage = await ImageManipulator.manipulateAsync(
-        coverImage,
-        [],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-      );
+      let coverImagePayload: any = undefined;
+      if (coverImage) {
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          coverImage,
+          [],
+          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+        );
 
-      if (!manipulatedImage.uri) {
-        throw new Error('Image processing failed: URI is empty');
+        if (manipulatedImage.uri) {
+          const uriParts = manipulatedImage.uri.split('.');
+          const fileExt = uriParts[uriParts.length - 1]?.toLowerCase() || 'jpg';
+          const mimeType = fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg'
+            : fileExt === 'png' ? 'image/png'
+              : 'image/jpeg'; // fallback
+
+          coverImagePayload = {
+            uri: manipulatedImage.uri,
+            name: `event_${Date.now()}.${fileExt}`,
+            type: mimeType,
+          };
+        }
       }
-      const uriParts = manipulatedImage.uri.split('.');
-      const fileExt = uriParts[uriParts.length - 1]?.toLowerCase() || 'jpg';
-      const mimeType = fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg'
-        : fileExt === 'png' ? 'image/png'
-          : 'image/jpeg'; // fallback
 
       const event = await createEvent.mutateAsync({
         organizer_id: user.id,
@@ -220,11 +227,7 @@ export default function CreateEventScreen() {
         equipment: Array.from(selectedEquipment).join(',') || undefined,
         difficulty,
         eco_point_reward: data.ecoPointReward || 0,
-        cover_image_url: {
-          uri: manipulatedImage.uri,
-          name: `event_${Date.now()}.${fileExt}`,
-          type: mimeType,
-        } as any,
+        cover_image_url: coverImagePayload,
         status: 'upcoming',
       });
       router.replace(`/events/${event.id}`);

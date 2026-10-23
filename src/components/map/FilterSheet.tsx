@@ -61,6 +61,8 @@ export function FilterSheet({
     onClose();
   }, [onClose]);
 
+  if (!visible) return null;
+
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.35} pressBehavior="close" />
