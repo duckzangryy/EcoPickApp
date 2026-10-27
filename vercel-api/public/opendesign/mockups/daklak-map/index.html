@@ -248,6 +248,11 @@ function zoomFor(delta){
   return Math.max(6, Math.min(19, Math.round(z)));
 }
 
+// Nhận lệnh điều khiển từ app (web: iframe contentWindow.postMessage)
+window.addEventListener('message', (ev) => {
+  if (ev.source && ev.data && (ev.data.type || '').startsWith('ECOPICK_')) window.ECOPICK_CMD(ev.data);
+});
+
 renderMarkers();fetchShared();setInterval(fetchShared,4000);
 send({type:'ECOPICK_READY'});
 </script>

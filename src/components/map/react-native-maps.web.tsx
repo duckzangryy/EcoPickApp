@@ -33,6 +33,7 @@ const getMapSource = () => DAKLAK_MAP_PAGE;
 
 export const MapView = forwardRef<MapViewRef, MapViewProps>((props, ref) => {
   const { style, initialRegion, region: controlledRegion, onRegionChangeComplete } = props;
+  const iframeRef = React.useRef<HTMLIFrameElement | null>(null);
   const [currentRegion, setCurrentRegion] = useState<Region>(
     controlledRegion || initialRegion || {
       latitude: 12.6828,
@@ -42,9 +43,20 @@ export const MapView = forwardRef<MapViewRef, MapViewProps>((props, ref) => {
     }
   );
 
+  const postCmd = React.useCallback((cmd: Record<string, unknown>) => {
+    iframeRef.current?.contentWindow?.postMessage(cmd, '*');
+  }, []);
+
   useImperativeHandle(ref, () => ({
     animateToRegion: (newRegion: Region) => {
       setCurrentRegion(newRegion);
+      postCmd({
+        type: 'ECOPICK_SET_REGION',
+        latitude: newRegion.latitude,
+        longitude: newRegion.longitude,
+        latitudeDelta: newRegion.latitudeDelta,
+        animate: true,
+      });
       onRegionChangeComplete?.(newRegion);
     },
     fitToCoordinates: (coords: any[]) => {
@@ -56,6 +68,7 @@ export const MapView = forwardRef<MapViewRef, MapViewProps>((props, ref) => {
           longitudeDelta: 0.05,
         };
         setCurrentRegion(newRegion);
+        postCmd({ type: 'ECOPICK_FIT_COORDS', coords });
         onRegionChangeComplete?.(newRegion);
       }
     },
@@ -65,6 +78,7 @@ export const MapView = forwardRef<MapViewRef, MapViewProps>((props, ref) => {
   return (
     <View style={[styles.container, style]}>
       <iframe
+        ref={iframeRef}
         title="Bản đồ ảnh Đắk Lắk"
         src={getMapSource()}
         allow="geolocation"
