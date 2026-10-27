@@ -16,19 +16,32 @@ export function SeverityChip({ severity, label, selected = false, onPress }: Sev
 
   return (
     <TouchableOpacity
-      activeOpacity={0.7}
+      activeOpacity={0.75}
       onPress={onPress}
       style={[
         styles.chip,
         {
           backgroundColor: theme.backgroundColor,
           borderColor: theme.borderColor,
-          opacity: selected ? 1 : 0.6,
+          borderWidth: selected ? 1.5 : 1,
+          opacity: selected ? 1 : 0.45,
+          shadowColor: selected ? theme.dotColor : 'transparent',
+          shadowOpacity: selected ? 0.25 : 0,
         },
       ]}
     >
       <View style={[styles.dot, { backgroundColor: theme.dotColor }]} />
-      <Text style={[styles.label, { color: theme.textColor }]}>{label}</Text>
+      <Text
+        style={[
+          styles.label,
+          {
+            color: theme.textColor,
+            fontFamily: selected ? Fonts.bold : Fonts.medium,
+          },
+        ]}
+      >
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -37,12 +50,13 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 13,
-    paddingVertical: 1,
+    paddingHorizontal: 14,
     borderRadius: 9999,
-    borderWidth: 1,
-    height: 32,
-    gap: 8,
+    height: 34,
+    gap: 7,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    elevation: 2,
   },
   dot: {
     width: 8,
@@ -50,8 +64,7 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
   },
   label: {
-    fontFamily: Fonts.semiBold,
-    fontSize: FontSizes.sm,
-    lineHeight: LineHeights.sm,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

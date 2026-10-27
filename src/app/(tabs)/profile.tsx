@@ -145,12 +145,14 @@ function StatCard({
   colors: ReturnType<typeof getColors>;
 }) {
   return (
-    <View style={[styles.statCard, { backgroundColor: colors.card } ]}>
+    <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border } ]}>
       <View style={[styles.statIconContainer, { backgroundColor: bgColor }]}>
-        <Ionicons name={icon as any} size={18} color={iconColor} />
+        <Ionicons name={icon as any} size={20} color={iconColor} />
       </View>
-      <AnimatedCounter value={value} style={[styles.statValue, { color: colors.textPrimary }]} />
-      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <View style={styles.statTextWrap}>
+        <AnimatedCounter value={value} style={[styles.statValue, { color: colors.textPrimary }]} />
+        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
+      </View>
     </View>
   );
 }
@@ -737,15 +739,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: BorderRadius.full,
     borderWidth: 1.5,
     borderColor: Colors.primary,
     backgroundColor: Colors.white,
     marginBottom: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 2,
   },
   editProfileBtnText: {
-    fontFamily: Fonts.semiBold,
+    fontFamily: Fonts.bold,
     fontSize: FontSizes.sm,
     color: Colors.primary,
   },
@@ -784,7 +791,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
-    // marginTop: 10,
   },
   metaItem: {
     flexDirection: 'row',
@@ -792,7 +798,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    fontFamily: Fonts.regular,
+    fontFamily: Fonts.medium,
     fontSize: FontSizes.sm,
     color: Colors.textSecondary,
   },
@@ -803,31 +809,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: Spacing.base + 4,
     marginTop: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
   socialStatItem: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
   },
   socialStatValue: {
     fontFamily: Fonts.bold,
-    fontSize: FontSizes.lg,
-    lineHeight: 24,
+    fontSize: 22,
+    lineHeight: 26,
     color: Colors.textPrimary,
+    letterSpacing: -0.5,
   },
   socialStatLabel: {
-    fontFamily: Fonts.regular,
-    fontSize: FontSizes.xs,
+    fontFamily: Fonts.medium,
+    fontSize: 12,
     color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   socialStatDivider: {
     width: 1,
-    height: 28,
+    height: 30,
     backgroundColor: Colors.border,
   },
 
@@ -836,11 +842,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base,
     paddingTop: Spacing.lg,
   },
-  rewardsEntry: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border },
+  rewardsEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: Colors.white,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.06)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+      },
+      android: { elevation: 3 },
+      default: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+      },
+    }),
+  },
   rewardsEntryIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  rewardsEntryText: { flex: 1, gap: 3 },
-  rewardsEntryTitle: { fontFamily: Fonts.semiBold, fontSize: FontSizes.md, color: Colors.textPrimary },
-  rewardsEntrySubtitle: { fontFamily: Fonts.regular, fontSize: FontSizes.sm, color: Colors.textSecondary },
+  rewardsEntryText: { flex: 1, gap: 2 },
+  rewardsEntryTitle: { fontFamily: Fonts.bold, fontSize: 16, color: Colors.textPrimary },
+  rewardsEntrySubtitle: { fontFamily: Fonts.regular, fontSize: 13, color: Colors.textSecondary },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -849,10 +879,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: Fonts.bold,
-    fontSize: FontSizes.lg,
+    fontSize: 18,
     lineHeight: 24,
     color: Colors.textPrimary,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   viewAllText: {
     fontFamily: Fonts.semiBold,
@@ -873,38 +903,49 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
+    borderRadius: 18,
     padding: 16,
-    gap: 8,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.06)',
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.07,
+        shadowRadius: 12,
       },
-      android: { elevation: 2 },
+      android: { elevation: 3 },
+      default: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.07,
+        shadowRadius: 12,
+      },
     }),
   },
   statIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  statTextWrap: {
+    gap: 2,
+  },
   statValue: {
     fontFamily: Fonts.bold,
-    fontSize: FontSizes.xxl,
-    lineHeight: 30,
+    fontSize: 26,
+    lineHeight: 32,
     color: Colors.textPrimary,
+    letterSpacing: -0.5,
   },
   statLabel: {
     fontFamily: Fonts.medium,
-    fontSize: FontSizes.xs,
+    fontSize: 13,
     color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
 
   // ─── Badges ───

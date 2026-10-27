@@ -57,6 +57,21 @@ const server = http.createServer((req, res) => {
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
       }
+      * {
+        outline: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      *:focus, *:focus-visible, *:active {
+        outline: none !important;
+      }
+      a, button, [role="tab"], [role="button"] {
+        outline: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      [role="tab"]:focus, [role="tab"]:focus-visible {
+        outline: none !important;
+        box-shadow: none !important;
+      }
       [dir="auto"]:not([style*="Ionicons"]):not([style*="Material"]):not([style*="FontAwesome"]):not([style*="Feather"]):not([style*="Entypo"]):not([style*="Octicons"]):not([style*="AntDesign"]):not([style*="SimpleLineIcons"]):not([style*="font-family: Ionicons"]):not([style*="font-family: 'Ionicons'"]) {
         font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         -webkit-font-smoothing: antialiased;

@@ -52,6 +52,30 @@ function getCategoryIcon(category?: string): string {
   return CATEGORY_ICON[category] ?? CATEGORY_ICON.default;
 }
 
+// ─── Reward Image with Fallback ───────────────────────────────────────────────
+function RewardItemImage({ uri, category }: { uri?: string; category?: string }) {
+  const [hasError, setHasError] = React.useState(false);
+  const fallbackIcon =
+    category === 'beverage' ? 'water-outline' : category === 'food' ? 'cafe-outline' : 'gift-outline';
+
+  if (!uri || hasError) {
+    return (
+      <View style={styles.rewardImageFallback}>
+        <Ionicons name={fallbackIcon as any} size={34} color={Colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={styles.rewardImage}
+      resizeMode="cover"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
 // ─── Badge Card ────────────────────────────────────────────────────────────────
 interface BadgeCardProps {
   badge: {
@@ -319,18 +343,46 @@ export default function BadgesScreen() {
             const inStock = reward.available_quantity === undefined || reward.available_quantity > 0;
             return (
               <Reanimated.View key={reward.id} entering={FadeInDown.duration(260)} style={[styles.rewardCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                {reward.image_url ? <Image source={{ uri: reward.image_url }} style={styles.rewardImage} /> : <View style={styles.rewardImageFallback}><Ionicons name="gift-outline" size={28} color={Colors.primary} /></View>}
+                <RewardItemImage uri={reward.image_url} category={reward.category} />
                 <View style={styles.rewardInfo}>
                   <Text style={[styles.rewardName, { color: colors.textPrimary }]}>{reward.title}</Text>
-                  {!!reward.sponsor && <Text style={[styles.rewardSponsor, { color: colors.textSecondary }]}>Tài trợ bởi {reward.sponsor}</Text>}
-                  {!!reward.description && <Text style={[styles.rewardDesc, { color: colors.textSecondary }]} numberOfLines={2}>{reward.description}</Text>}
-                  <Text style={[styles.rewardCost, { color: theme === 'dark' ? '#FBBF24' : '#B45309' } ]}>{reward.points_cost} điểm{reward.available_quantity !== undefined ? ` · Còn ${reward.available_quantity}` : ''}</Text>
+                  {!!reward.sponsor && (
+                    <Text style={[styles.rewardSponsor, { color: colors.primary }]}>
+                      Tài trợ bởi {reward.sponsor}
+                    </Text>
+                  )}
+                  {!!reward.description && (
+                    <Text style={[styles.rewardDesc, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {reward.description}
+                    </Text>
+                  )}
+                  <View style={styles.rewardCostRow}>
+                    <Text style={[styles.rewardCost, { color: theme === 'dark' ? '#FBBF24' : '#B45309' }]}>
+                      {reward.points_cost} điểm
+                    </Text>
+                    {reward.available_quantity !== undefined && (
+                      <Text style={[styles.rewardStockBadge, { color: colors.textSecondary }]}>
+                        • Còn {reward.available_quantity}
+                      </Text>
+                    )}
+                  </View>
                   <TouchableOpacity
-                    style={[styles.redeemButton, (!affordable || !inStock || redeemMutation.isPending) && styles.redeemButtonDisabled]}
+                    style={[
+                      styles.redeemButton,
+                      (!affordable || !inStock || redeemMutation.isPending) && styles.redeemButtonDisabled,
+                    ]}
                     disabled={!affordable || !inStock || redeemMutation.isPending}
                     onPress={() => setConfirmReward({ id: reward.id, title: reward.title, points_cost: reward.points_cost })}
+                    activeOpacity={0.8}
                   >
-                    <Text style={styles.redeemButtonText}>{!inStock ? 'Hết quà' : affordable ? 'Đổi quà' : 'Chưa đủ điểm'}</Text>
+                    <Text
+                      style={[
+                        styles.redeemButtonText,
+                        (!affordable || !inStock) && styles.redeemButtonTextDisabled,
+                      ]}
+                    >
+                      {!inStock ? 'Hết quà' : affordable ? 'Đổi quà' : 'Chưa đủ điểm'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </Reanimated.View>
@@ -459,19 +511,25 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.base,
     marginTop: Spacing.base,
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.base,
-    gap: Spacing.md,
+    borderRadius: 20,
+    padding: 18,
+    gap: 14,
     borderWidth: 1,
-    borderColor: Colors.primaryBorder,
+    borderColor: 'rgba(15, 23, 42, 0.06)',
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 14,
       },
-      android: { elevation: 2 },
+      android: { elevation: 3 },
+      default: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 14,
+      },
     }),
   },
   progressHeader: {
@@ -481,41 +539,46 @@ const styles = StyleSheet.create({
   },
   progressTitle: {
     fontFamily: Fonts.bold,
-    fontSize: FontSizes.base,
+    fontSize: 18,
     color: Colors.textPrimary,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   progressSub: {
     fontFamily: Fonts.regular,
-    fontSize: FontSizes.sm,
+    fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
   },
   progressCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: BorderRadius.full,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(32,105,58,0.15)',
+    borderWidth: 2.5,
+    borderColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
   },
   progressPercent: {
     fontFamily: Fonts.bold,
-    fontSize: FontSizes.md,
+    fontSize: 16,
     color: Colors.primary,
   },
   progressBarTrack: {
     height: 8,
-    backgroundColor: 'rgba(32,105,58,0.08)',
-    borderRadius: BorderRadius.full,
+    backgroundColor: 'rgba(32,105,58,0.1)',
+    borderRadius: 4,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.full,
+    borderRadius: 4,
   },
   progressStats: {
     flexDirection: 'row',
@@ -524,11 +587,11 @@ const styles = StyleSheet.create({
   progressStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   progressStatText: {
-    fontFamily: Fonts.medium,
-    fontSize: FontSizes.sm,
+    fontFamily: Fonts.bold,
+    fontSize: 13,
     color: '#16A34A',
   },
   sectionBlock: {
@@ -538,15 +601,15 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     marginBottom: Spacing.xs,
   },
   sectionTitle: {
     fontFamily: Fonts.bold,
-    fontSize: FontSizes.base,
+    fontSize: 18,
     color: Colors.textPrimary,
     flex: 1,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   sectionCountPill: {
     backgroundColor: Colors.primaryLight,
@@ -555,11 +618,11 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
   },
   sectionCountText: {
-    fontFamily: Fonts.semiBold,
+    fontFamily: Fonts.bold,
     fontSize: FontSizes.xs,
     color: Colors.primary,
   },
-  balanceText: { fontFamily: Fonts.semiBold, fontSize: FontSizes.sm, color: Colors.primary },
+  balanceText: { fontFamily: Fonts.bold, fontSize: 14, color: Colors.primary },
   successOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   successCard: { width: '100%', maxWidth: 380, backgroundColor: Colors.white, borderRadius: 24, padding: 24, alignItems: 'center', gap: 10 },
   successIcon: { width: 58, height: 58, borderRadius: 29, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
@@ -568,34 +631,102 @@ const styles = StyleSheet.create({
   successCode: { fontFamily: Fonts.bold, fontSize: FontSizes.lg, color: Colors.primary, letterSpacing: 1.5 },
   successButton: { alignSelf: 'stretch', alignItems: 'center', backgroundColor: Colors.primary, paddingVertical: 13, borderRadius: BorderRadius.full, marginTop: 10 },
   successHistoryLink: { fontFamily: Fonts.semiBold, fontSize: FontSizes.sm, color: Colors.primary, paddingTop: 4 },
-  rewardCard: { flexDirection: 'row', backgroundColor: Colors.white, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.primaryBorder, padding: Spacing.md, gap: Spacing.md },
-  rewardImage: { width: 88, height: 88, borderRadius: BorderRadius.md, backgroundColor: '#F1F5F9' },
-  rewardImageFallback: { width: 88, height: 88, borderRadius: BorderRadius.md, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  rewardInfo: { flex: 1, gap: 4 },
-  rewardName: { fontFamily: Fonts.semiBold, fontSize: FontSizes.md, color: Colors.textPrimary },
-  rewardSponsor: { fontFamily: Fonts.medium, fontSize: FontSizes.xs, color: Colors.primary },
-  rewardDesc: { fontFamily: Fonts.regular, fontSize: FontSizes.sm, color: Colors.textSecondary },
-  rewardCost: { fontFamily: Fonts.bold, fontSize: FontSizes.sm, color: '#B45309' },
-  redeemButton: { alignSelf: 'flex-start', backgroundColor: Colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: BorderRadius.full, marginTop: 4 },
-  redeemButtonDisabled: { backgroundColor: '#94A3B8' },
-  redeemButtonText: { fontFamily: Fonts.semiBold, fontSize: FontSizes.sm, color: Colors.white },
+  rewardCard: {
+    flexDirection: 'row',
+    backgroundColor: Colors.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.06)',
+    padding: 14,
+    gap: 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.07,
+        shadowRadius: 10,
+      },
+      android: { elevation: 3 },
+      default: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.07,
+        shadowRadius: 10,
+      },
+    }),
+  },
+  rewardImage: {
+    width: 92,
+    height: 92,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+  },
+  rewardImageFallback: {
+    width: 92,
+    height: 92,
+    borderRadius: 14,
+    backgroundColor: 'rgba(32,105,58,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(32,105,58,0.15)',
+  },
+  rewardInfo: { flex: 1, gap: 4, justifyContent: 'center' },
+  rewardName: { fontFamily: Fonts.bold, fontSize: 16, lineHeight: 22, color: Colors.textPrimary },
+  rewardSponsor: { fontFamily: Fonts.medium, fontSize: 12, color: Colors.primary },
+  rewardDesc: { fontFamily: Fonts.regular, fontSize: 13, lineHeight: 18, color: Colors.textSecondary },
+  rewardCostRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  rewardCost: { fontFamily: Fonts.bold, fontSize: 14, color: '#D97706' },
+  rewardStockBadge: { fontFamily: Fonts.regular, fontSize: 12, color: Colors.textSecondary },
+  redeemButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
+    marginTop: 6,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  redeemButtonDisabled: {
+    backgroundColor: '#E2E8F0',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  redeemButtonText: {
+    fontFamily: Fonts.bold,
+    fontSize: 13,
+    color: Colors.white,
+  },
+  redeemButtonTextDisabled: {
+    color: '#94A3B8',
+  },
   badgeCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    gap: Spacing.md,
+    borderRadius: 18,
+    padding: 16,
+    gap: 14,
     borderWidth: 1,
-    borderColor: Colors.primaryBorder,
+    borderColor: 'rgba(15, 23, 42, 0.06)',
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
       },
-      android: { elevation: 1 },
+      android: { elevation: 2 },
+      default: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
     }),
   },
   badgeCardLocked: {
@@ -606,7 +737,7 @@ const styles = StyleSheet.create({
   badgeIconWrap: {
     width: 64,
     height: 64,
-    borderRadius: BorderRadius.md,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -643,29 +774,29 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   badgeName: {
-    fontFamily: Fonts.semiBold,
-    fontSize: FontSizes.md,
+    fontFamily: Fonts.bold,
+    fontSize: 16,
     color: Colors.textPrimary,
     flexShrink: 1,
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   badgeNameLocked: {
     color: Colors.textSecondary,
   },
   categoryPill: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: BorderRadius.full,
     flexShrink: 0,
   },
   categoryPillText: {
-    fontFamily: Fonts.medium,
-    fontSize: FontSizes.xs,
+    fontFamily: Fonts.bold,
+    fontSize: 11,
   },
   badgeDesc: {
     fontFamily: Fonts.regular,
-    fontSize: FontSizes.sm,
-    lineHeight: LineHeights.sm,
+    fontSize: 13,
+    lineHeight: 18,
     color: Colors.textSecondary,
   },
   skeletonCard: {
