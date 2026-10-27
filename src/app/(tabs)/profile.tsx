@@ -599,6 +599,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.base,
+    maxWidth: 768,
+    width: '100%',
+    alignSelf: 'center',
   },
   topActionSpacer: {
     width: 40,
@@ -627,6 +630,9 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     paddingBottom: 0,
+    maxWidth: 768,
+    width: '100%',
+    alignSelf: 'center',
   },
 
   // ─── Banner ───

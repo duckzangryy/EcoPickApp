@@ -470,6 +470,9 @@ const s = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    maxWidth: 768,
+    width: '100%',
+    alignSelf: 'center',
   },
   closeBtn: {
     width: 40,
@@ -520,6 +523,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 14,
+    maxWidth: 768,
+    width: '100%',
+    alignSelf: 'center',
   },
   stepPill: {
     flexDirection: 'row',
@@ -559,6 +565,9 @@ const s = StyleSheet.create({
   },
   scrollInner: {
     paddingBottom: 24,
+    maxWidth: 768,
+    width: '100%',
+    alignSelf: 'center',
   },
 
   // ─── Bottom Bar ───
@@ -576,6 +585,9 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    maxWidth: 768,
+    width: '100%',
+    alignSelf: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
   },

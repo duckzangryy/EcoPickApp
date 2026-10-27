@@ -423,6 +423,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(246,248,247,0.95)',
     borderBottomWidth: 1,
     borderBottomColor: Colors.primaryBorder,
+    width: '100%',
+    maxWidth: 768,
+    alignSelf: 'center',
   },
   headerTitle: {
     fontFamily: Fonts.bold,
@@ -448,6 +451,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 110,
     gap: Spacing.base,
+    width: '100%',
+    maxWidth: 768,
+    alignSelf: 'center',
   },
   progressBanner: {
     marginHorizontal: Spacing.base,

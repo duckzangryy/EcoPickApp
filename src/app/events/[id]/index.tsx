@@ -243,39 +243,41 @@ export default function EventDetailScreen() {
 
       {/* Bottom Join Button */}
       <View style={[s.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) + (Platform.OS === 'ios' ? 12 : 8), backgroundColor: colors.card, borderTopColor: colors.border }]}>
-        <TouchableOpacity
-          style={[
-            s.mainJoinButton,
-            joined && { backgroundColor: colors.borderMedium },
-            isEventEnded && s.disabledButton,
-          ]}
-          onPress={handleJoinEvent}
-          activeOpacity={0.8}
-          disabled={isEventEnded || joinMutation.isPending || leaveMutation.isPending}
-        >
-          {joinMutation.isPending || leaveMutation.isPending ? (
-            <ActivityIndicator size="small" color={Colors.white} />
-          ) : (
-            <Ionicons
-              name={
-                isEventEnded
-                  ? 'close-circle'
-                  : joined
-                    ? 'checkmark-circle'
-                    : 'person-add-outline'
-              }
-              size={16.4}
-              color={Colors.white}
-            />
-          )}
-          <Text style={s.mainJoinButtonText}>
-            {isEventEnded
-              ? t('eventDetail.eventEnded')
-              : joined
-                ? t('eventDetail.joined')
-                : t('eventDetail.letJoin')}
-          </Text>
-        </TouchableOpacity>
+        <View style={s.bottomBarInner}>
+          <TouchableOpacity
+            style={[
+              s.mainJoinButton,
+              joined && { backgroundColor: colors.borderMedium },
+              isEventEnded && s.disabledButton,
+            ]}
+            onPress={handleJoinEvent}
+            activeOpacity={0.8}
+            disabled={isEventEnded || joinMutation.isPending || leaveMutation.isPending}
+          >
+            {joinMutation.isPending || leaveMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <Ionicons
+                name={
+                  isEventEnded
+                    ? 'close-circle'
+                    : joined
+                      ? 'checkmark-circle'
+                      : 'person-add-outline'
+                }
+                size={16.4}
+                color={Colors.white}
+              />
+            )}
+            <Text style={s.mainJoinButtonText}>
+              {isEventEnded
+                ? t('eventDetail.eventEnded')
+                : joined
+                  ? t('eventDetail.joined')
+                  : t('eventDetail.letJoin')}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -301,7 +303,14 @@ const s = StyleSheet.create({
   retryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
   retryButtonText: { fontFamily: Fonts.bold, fontSize: 14, color: Colors.white },
   scrollContainer: { flex: 1 },
-  contentContainer: { paddingTop: 16, paddingBottom: 120, gap: 16 },
+  contentContainer: {
+    paddingTop: 16,
+    paddingBottom: 120,
+    gap: 16,
+    width: '100%',
+    maxWidth: 768,
+    alignSelf: 'center',
+  },
   detailsSection: { paddingHorizontal: 16, gap: 24 },
   bottomBar: {
     position: 'absolute',
@@ -313,6 +322,11 @@ const s = StyleSheet.create({
     paddingTop: 17,
     borderTopWidth: 1,
     borderTopColor: 'rgba(32,105,58,0.1)',
+  },
+  bottomBarInner: {
+    width: '100%',
+    maxWidth: 768,
+    alignSelf: 'center',
   },
   mainJoinButton: { backgroundColor: '#20693A', paddingVertical: 16, borderRadius: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   joinedButton: { backgroundColor: '#0F172A' },

@@ -1,16 +1,64 @@
 
-import React from 'react';
-import { View, Text, StyleSheet, Image, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Fonts } from '../../../../constants';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CHAT_AVATAR } from '../constants';
+import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Fonts } from '../../../../constants';
 import { getColors } from '@/constants/Colors';
+import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
+import { CHAT_AVATAR } from '../constants';
+
+interface ChatMessage {
+  id: string;
+  author: string;
+  time: string;
+  text: string;
+  isMe: boolean;
+}
 
 export default function EventChat() {
   const { t } = useTranslation();
   const colors = getColors(useThemeStore((state) => state.theme));
+  const user = useAuthStore((state) => state.user);
+
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: '1',
+      author: 'Mark T.',
+      time: '08:15',
+      text: 'Mình mang theo 3 bao tải dứa và găng tay cao su dự phòng cho nhóm nhé!',
+      isMe: false,
+    },
+    {
+      id: '2',
+      author: user?.fullname || 'Bạn',
+      time: '08:20',
+      text: 'Tuyệt vời, cảm ơn bạn rất nhiều! Hẹn gặp cả đội tại điểm tập kết đúng giờ.',
+      isMe: true,
+    },
+  ]);
+  const [inputText, setInputText] = useState('');
+
+  const handleSend = () => {
+    const trimmed = inputText.trim();
+    if (!trimmed) return;
+
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `msg-${Date.now()}`,
+        author: user?.fullname || 'Bạn',
+        time: timeStr,
+        text: trimmed,
+        isMe: true,
+      },
+    ]);
+    setInputText('');
+  };
 
   return (
     <View style={s.chatSection}>
@@ -19,50 +67,61 @@ export default function EventChat() {
           <Ionicons name="chatbubbles-outline" size={20} color={colors.textPrimary} />
           <Text style={[s.sectionTitleText, { color: colors.textPrimary }]}>{t('eventDetail.coordination')}</Text>
         </View>
-        <Text style={[s.newMessagesText, { color: colors.textSecondary }]}>{t('eventDetail.newMessages', { count: 3 })}</Text>
+        <Text style={[s.newMessagesText, { color: colors.textSecondary }]}>
+          {t('eventDetail.newMessages', { count: messages.length })}
+        </Text>
       </View>
 
       <View style={s.chatMessages}>
-        {/* Message from other user — left aligned */}
-        <View style={s.chatRowLeft}>
-          <Image source={{ uri: CHAT_AVATAR }} style={s.chatAvatar} />
-          <View style={[s.chatBubbleLeft, { backgroundColor: colors.card }]}>
-            <View style={s.chatBubbleHeader}>
-              <Text style={[s.chatAuthor, { color: colors.textPrimary }]}>Mark T.</Text>
-              <Text style={[s.chatTime, { color: colors.textPlaceholder }]}>10:24 AM</Text>
+        {messages.map((msg) =>
+          msg.isMe ? (
+            <View key={msg.id} style={s.chatRowRight}>
+              <View style={[s.chatBubbleRight, { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1 }]}>
+                <View style={s.chatBubbleHeaderRight}>
+                  <Text style={[s.chatTimeRight, { color: colors.textPlaceholder }]}>{msg.time}</Text>
+                  <Text style={[s.chatOrganizer, { color: colors.primary }]}>{msg.author}</Text>
+                </View>
+                <Text style={[s.chatTextRight, { color: colors.textPrimary }]}>{msg.text}</Text>
+              </View>
+              <View style={[s.youBadge, { backgroundColor: colors.primary }]}>
+                <Ionicons name="person" size={14} color="#fff" />
+              </View>
             </View>
-            <Text style={[s.chatText, { color: colors.textPrimary }]}>
-              {"I'll bring an extra pair of grabbers if anyone needs them!"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Message from you — right aligned */}
-        <View style={s.chatRowRight}>
-          <View style={[s.chatBubbleRight, { backgroundColor: colors.background }]}>
-            <View style={s.chatBubbleHeaderRight}>
-              <Text style={[s.chatTimeRight, { color: colors.textPlaceholder }]}>10:30 AM</Text>
-              <Text style={[s.chatOrganizer, { color: colors.primary }]}>{t('common.organizer')}</Text>
+          ) : (
+            <View key={msg.id} style={s.chatRowLeft}>
+              <Image source={{ uri: CHAT_AVATAR }} style={s.chatAvatar} />
+              <View style={[s.chatBubbleLeft, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
+                <View style={s.chatBubbleHeader}>
+                  <Text style={[s.chatAuthor, { color: colors.textPrimary }]}>{msg.author}</Text>
+                  <Text style={[s.chatTime, { color: colors.textPlaceholder }]}>{msg.time}</Text>
+                </View>
+                <Text style={[s.chatText, { color: colors.textPrimary }]}>{msg.text}</Text>
+              </View>
             </View>
-            <Text style={[s.chatTextRight, { color: colors.textPrimary }]}>That would be great, Mark! Thanks.</Text>
-          </View>
-          <View style={[s.youBadge, { backgroundColor: colors.primary }]}>
-            <Text style={[s.youBadgeText, { color: colors.background }]}>{t('common.you')}</Text>
-          </View>
-        </View>
+          )
+        )}
       </View>
 
       {/* Send Input */}
       <View style={s.sendInputContainer}>
-        <View style={[s.sendInputBox, { backgroundColor: colors.background }]}>
+        <View style={[s.sendInputBox, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
           <TextInput
             style={[s.sendInput, { color: colors.textPrimary }]}
-            placeholder={t('eventDetail.postUpdate')}
+            placeholder={t('eventDetail.postUpdate', { defaultValue: 'Nhắn tin điều phối với nhóm...' })}
             placeholderTextColor={colors.textPlaceholder}
+            value={inputText}
+            onChangeText={setInputText}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
           />
         </View>
-        <TouchableOpacity style={[s.sendIconBox, { backgroundColor: colors.primary }]}>
-          <Ionicons name="paper-plane" size={14} color={colors.background} />
+        <TouchableOpacity
+          style={[s.sendIconBox, { backgroundColor: colors.primary, opacity: inputText.trim() ? 1 : 0.6 }]}
+          onPress={handleSend}
+          disabled={!inputText.trim()}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="paper-plane" size={15} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>

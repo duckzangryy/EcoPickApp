@@ -158,6 +158,9 @@ const styles = StyleSheet.create({
   listContainer: {
     padding: 16,
     gap: 10,
+    width: '100%',
+    maxWidth: 768,
+    alignSelf: 'center',
   },
   participantCard: {
     flexDirection: 'row',

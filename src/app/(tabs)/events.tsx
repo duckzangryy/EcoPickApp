@@ -12,6 +12,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -122,6 +123,8 @@ export default function EventsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const theme = useThemeStore((s) => s.theme);
@@ -138,27 +141,27 @@ export default function EventsScreen() {
   // ── Fetch events from API ──
   const { data: apiEvents = [], isLoading, isRefetching, isError, refetch } = useEvents();
 
-  // ── Handle Tab Press ──
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('tabPress_events', () => {
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-    });
-    return () => sub.remove();
-  }, []);
-
-
   const filteredEvents = useMemo(() => {
+    let list = apiEvents;
     if (activeTab === 'upcoming') {
-      return apiEvents.filter((e) => e.status === 'upcoming' || e.status === 'ongoing');
+      list = apiEvents.filter((e) => e.status === 'upcoming' || e.status === 'ongoing');
+    } else if (activeTab === 'myEvents') {
+      list = apiEvents.filter((e) => e.organizer_id === user?.id);
+    } else if (activeTab === 'past') {
+      list = apiEvents.filter((e) => e.status === 'completed' || e.status === 'cancelled');
     }
-    if (activeTab === 'myEvents') {
-      return apiEvents.filter((e) => e.organizer_id === user?.id);
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (e) =>
+          e.title?.toLowerCase().includes(q) ||
+          e.location?.toLowerCase().includes(q) ||
+          e.address?.toLowerCase().includes(q)
+      );
     }
-    if (activeTab === 'past') {
-      return apiEvents.filter((e) => e.status === 'completed' || e.status === 'cancelled');
-    }
-    return apiEvents;
-  }, [activeTab, apiEvents, user?.id]);
+    return list;
+  }, [activeTab, apiEvents, user?.id, searchQuery]);
 
   const handleJoinEvent = useCallback(
     (event: Event) => {
@@ -256,16 +259,55 @@ export default function EventsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 16 : 0), backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View style={styles.logoContainer}>
-          <Image source={require('../../assets/logo.png')} style={styles.logo} />
-        </View>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('events.headerTitle')}</Text>
-        <View style={styles.searchContainer}>
-          <TouchableOpacity style={styles.searchButton}>
-            <Ionicons name="search" size={18} color={colors.textPrimary} />
-          </TouchableOpacity>
+        <View style={styles.headerInner}>
+          <View style={styles.logoContainer}>
+            <Image source={require('../../assets/logo.png')} style={styles.logo} />
+          </View>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('events.headerTitle')}</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[styles.searchButton, isSearchVisible && { backgroundColor: colors.primaryLight }]}
+              onPress={() => {
+                setIsSearchVisible((v) => !v);
+                if (isSearchVisible) setSearchQuery('');
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={isSearchVisible ? 'close' : 'search'} size={18} color={isSearchVisible ? colors.primary : colors.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.createBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/events/create')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={16} color="#fff" />
+              <Text style={styles.createBtnText}>Tạo</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
+
+      {/* Search Bar */}
+      {isSearchVisible && (
+        <View style={styles.searchBarWrapper}>
+          <View style={[styles.searchBarInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.textPrimary }]}
+              placeholder="Tìm sự kiện theo tên hoặc địa điểm..."
+              placeholderTextColor={colors.textPlaceholder}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Tabs */}
       <View style={styles.tabsWrapper}>
@@ -332,24 +374,29 @@ const styles = StyleSheet.create({
 
   // ─── Header ───
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 12,
     backgroundColor: 'rgba(255,255,255,0.8)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(32,105,58,0.1)',
   },
+  headerInner: {
+    width: '100%',
+    maxWidth: 768,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   logoContainer: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logo: {
-    width: 29,
-    height: 39,
+    width: 28,
+    height: 36,
     resizeMode: 'contain',
   },
   headerTitle: {
@@ -360,23 +407,70 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flex: 1,
   },
-  searchContainer: {
-    width: 40,
-    alignItems: 'flex-end',
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   searchButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  createBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  createBtnText: {
+    color: '#fff',
+    fontFamily: Fonts.bold,
+    fontSize: 13,
+  },
+
+  // ─── Search Bar ───
+  searchBarWrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 4,
+    width: '100%',
+    maxWidth: 768,
+    alignSelf: 'center',
+  },
+  searchBarInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: Fonts.regular,
+    fontSize: 14,
+    height: '100%',
   },
 
   // ─── Tabs ───
   tabsWrapper: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    width: '100%',
+    maxWidth: 768,
+    alignSelf: 'center',
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -412,7 +506,9 @@ const styles = StyleSheet.create({
   // ─── Event List ───
   listContent: {
     paddingHorizontal: 16,
-    // paddingBottom: 300,
+    width: '100%',
+    maxWidth: 768,
+    alignSelf: 'center',
   },
 
   // ─── Event Card ───
