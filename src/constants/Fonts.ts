@@ -1,8 +1,25 @@
+import { Platform } from 'react-native';
+
+const WEB_FONT_FAMILY =
+  "'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
 export const Fonts = {
-  regular: 'Inter_400Regular',
-  medium: 'Inter_500Medium',
-  semiBold: 'Inter_600SemiBold',
-  bold: 'Inter_700Bold',
+  regular: Platform.select({
+    web: WEB_FONT_FAMILY,
+    default: 'Inter_400Regular',
+  }) as string,
+  medium: Platform.select({
+    web: WEB_FONT_FAMILY,
+    default: 'Inter_500Medium',
+  }) as string,
+  semiBold: Platform.select({
+    web: WEB_FONT_FAMILY,
+    default: 'Inter_600SemiBold',
+  }) as string,
+  bold: Platform.select({
+    web: WEB_FONT_FAMILY,
+    default: 'Inter_700Bold',
+  }) as string,
 } as const;
 
 export const FontSizes = {

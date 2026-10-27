@@ -44,7 +44,17 @@ export default function ReportSuccessScreen() {
   };
 
   const handleClose = () => {
-    router.replace('/map');
+    if (params.latitude && params.longitude) {
+      router.replace({
+        pathname: '/map',
+        params: {
+          focusLat: params.latitude,
+          focusLng: params.longitude,
+        },
+      });
+    } else {
+      router.replace('/map');
+    }
   };
 
   return (

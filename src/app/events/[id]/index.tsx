@@ -202,9 +202,13 @@ export default function EventDetailScreen() {
 
   const equipmentList = parseEquipment(event.equipment);
   const isEventEnded = event.status === 'completed' || event.status === 'cancelled';
-  const participantCount = participants.filter(
-    (p) => p.event === id && p.status === 'joined'
+  const joinedCount = participants.filter(
+    (p) => (p.event === id || (p as any).event_id === id) && (p.status === 'joined' || !p.status)
   ).length;
+  const participantCount = Math.max(
+    joinedCount,
+    Number(event.current_paticipants ?? (event as any).current_participants ?? 0)
+  );
 
   return (
     <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}>

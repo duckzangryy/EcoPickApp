@@ -1,5 +1,5 @@
 import { queryKeys } from "@/api/queryKeys";
-import { reportImageService, reportService, type CreateReportPayload, type Report } from "@/api/services/reportService";
+import { reportImageService, reportService, type CreateReportPayload, type Report, type AiWasteScanResult } from "@/api/services/reportService";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ============================================================
@@ -86,5 +86,12 @@ export const useUploadReportImage = () => {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.reports.images.lists() });
 		},
+	});
+};
+
+/** POST /api/ai/scan – Giám định ảnh bằng AI */
+export const useAiWasteScan = () => {
+	return useMutation({
+		mutationFn: (imageUri: string) => reportService.scanWasteImage(imageUri),
 	});
 };

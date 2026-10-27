@@ -14,7 +14,7 @@ import { ReportsBottomSheet, SearchBar, SeverityChip } from '../../components';
 import { FilterSheet, MarkerPreviewSheet, SearchOverlay, type MarkerPreviewSheetRef } from '../../components/map';
 import { BorderRadius, Colors, Fonts, FontSizes, getColors, Spacing } from '../../constants';
 import { useLayout } from '@/hooks/use-layout';
-import { INITIAL_REGION, SEVERITY_FILTERS, type SeverityLevel, type WasteReport } from '../../data/mockData';
+import { INITIAL_REGION, SEVERITY_FILTERS, STATUS_CONFIGS, WASTE_TYPE_CONFIGS, type ReportStatus, type SeverityLevel, type WasteReport, type WasteType } from '../../data/mockData';
 import { useReports } from '../../hooks/useReportQueries';
 import { useMapStore } from '../../stores/mapStore';
 import { useThemeStore } from '../../stores/themeStore';
@@ -210,20 +210,27 @@ const markerStyles = StyleSheet.create({
 // ─── API → UI severity mapping ──────────────────────────────────────
 const API_SEVERITY_TO_UI: Record<string, SeverityLevel> = {
   low: 'light',
+  light: 'light',
   medium: 'medium',
   high: 'heavy',
+  heavy: 'heavy',
   critical: 'extreme',
+  extreme: 'extreme',
 };
 
 function transformReportToWasteReport(r: Report): WasteReport {
-  const photoUrl = r.report_img || (r as any).thumb || (r as any).image_url || (Array.isArray((r as any).photo_urls) && (r as any).photo_urls[0]) || '';
+  // Marker chỉ 46px nên dùng ảnh thu nhỏ; chỉ lùi về ảnh gốc khi server chưa có thumb.
+  const photoUrl = r.thumb || r.report_img || (Array.isArray((r as any).photo_urls) && (r as any).photo_urls[0]) || '';
+  // waste_types/status chỉ có từ /api/photos sau khi server lưu kèm; nếu bản ghi cũ
+  // thiếu thì để rỗng thay vì bịa — bộ lọc sẽ bỏ qua thay vì ẩn oan marker.
+  const rawTypes = Array.isArray(r.waste_types) ? r.waste_types : [];
   return {
     id: r.id,
     title: r.location || r.title || (r.address as string | undefined) || `Report #${r.id.slice(0, 6)}`,
     description: r.description || '',
     severity: API_SEVERITY_TO_UI[r.severity || 'low'] || 'light',
-    wasteTypes: [],
-    status: 'reported',
+    wasteTypes: rawTypes.filter((t): t is WasteType => (WASTE_TYPE_CONFIGS as { key: string }[]).some((c) => c.key === t)),
+    status: (STATUS_CONFIGS.some((c) => c.key === r.status) ? r.status : 'reported') as ReportStatus,
     distance: '',
     latitude: r.latitude || 0,
     longitude: r.longitude || 0,
@@ -349,30 +356,53 @@ export default function MapScreen() {
 
   // ── Handle incoming route params ──
   useEffect(() => {
-    if (params.destLat && params.destLng && userLocation) {
-      calculateRoute(
-        userLocation.coords.latitude,
-        userLocation.coords.longitude,
-        parseFloat(params.destLat),
-        parseFloat(params.destLng),
-        params.destTitle || 'Destination',
-      );
+    if (params.destLat && params.destLng) {
+      const destLat = parseFloat(params.destLat);
+      const destLng = parseFloat(params.destLng);
+      const title = params.destTitle || 'Destination';
+      if (!Number.isFinite(destLat) || !Number.isFinite(destLng)) return;
+
+      const triggerRoute = async () => {
+        let sLat = userLocation?.coords.latitude;
+        let sLng = userLocation?.coords.longitude;
+        if (!sLat || !sLng) {
+          try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+              const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+              setUserLocation(loc);
+              sLat = loc.coords.latitude;
+              sLng = loc.coords.longitude;
+            }
+          } catch {}
+        }
+        sLat = sLat || INITIAL_REGION.latitude;
+        sLng = sLng || INITIAL_REGION.longitude;
+        calculateRoute(sLat, sLng, destLat, destLng, title);
+      };
+      triggerRoute();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.destLat, params.destLng, params.destTitle, userLocation]);
+  }, [params.destLat, params.destLng, params.destTitle]);
 
-  // ── Vừa gửi báo cáo: chỉ di chuyển bản đồ tới vị trí ảnh, không tính đường đi ──
+  // ── Vừa gửi báo cáo: tự động cập nhật dữ liệu và bay bản đồ tới vị trí ảnh ──
   useEffect(() => {
     const lat = parseFloat(params.focusLat || '');
     const lng = parseFloat(params.focusLng || '');
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    mapRef.current?.animateToRegion(
-      { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 },
-      800,
-    );
-    router.setParams({ focusLat: '', focusLng: '' });
+    refetchReports();
+    const timer = setTimeout(() => {
+      mapRef.current?.animateToRegion(
+        { latitude: lat, longitude: lng, latitudeDelta: 0.012, longitudeDelta: 0.012 },
+        1000,
+      );
+      router.setParams({ focusLat: '', focusLng: '' });
+    }, 450);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.focusLat, params.focusLng]);
+
+
 
   // ── Route Calculation ──
   const calculateRoute = useCallback(
@@ -399,10 +429,7 @@ export default function MapScreen() {
 
           if (mapRef.current) {
             mapRef.current.fitToCoordinates(
-              [
-                { latitude: startLat, longitude: startLng },
-                { latitude: destLat, longitude: destLng },
-              ],
+              coords,
               {
                 edgePadding: { top: 120, right: 60, bottom: 120, left: 60 },
                 animated: true,
@@ -563,22 +590,28 @@ export default function MapScreen() {
   }, [reportsWithDistance, selectMarker, router]);
 
 
-  const handleNavigateReport = useCallback(
-    (report: WasteReport) => {
-      if (mapRef.current) {
-        mapRef.current.animateToRegion(
-          {
-            latitude: report.latitude,
-            longitude: report.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          },
-          800,
-        );
+  const handleStartDirections = useCallback(
+    async (report: WasteReport) => {
+      markerSheetRef.current?.dismiss();
+      selectMarker(null);
+      let sLat = userLocation?.coords.latitude;
+      let sLng = userLocation?.coords.longitude;
+      if (!sLat || !sLng) {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            setUserLocation(loc);
+            sLat = loc.coords.latitude;
+            sLng = loc.coords.longitude;
+          }
+        } catch {}
       }
-      router.push(`/location/${report.id}`);
+      sLat = sLat || INITIAL_REGION.latitude;
+      sLng = sLng || INITIAL_REGION.longitude;
+      calculateRoute(sLat, sLng, report.latitude, report.longitude, report.title);
     },
-    [router],
+    [userLocation, calculateRoute, selectMarker],
   );
 
   const handleViewReport = useCallback(
@@ -687,6 +720,8 @@ export default function MapScreen() {
         .map((marker) => (
           <Marker
             key={marker.id}
+            id={marker.id}
+            title={marker.title}
             coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
             onPress={(e) => {
               e?.stopPropagation?.();
@@ -817,7 +852,7 @@ export default function MapScreen() {
         <ReportsBottomSheet
           reports={filteredReports}
           totalCount={filteredReports.length}
-          onNavigateReport={handleNavigateReport}
+          onNavigateReport={handleStartDirections}
           onViewReport={handleViewReport}
         />
       )}
@@ -825,7 +860,7 @@ export default function MapScreen() {
       <MarkerPreviewSheet
         ref={markerSheetRef}
         onViewDetails={handleViewDetails}
-        onGetDirections={(report) => handleNavigateReport(report)}
+        onGetDirections={handleStartDirections}
         onDismiss={() => selectMarker(null)}
       />
 

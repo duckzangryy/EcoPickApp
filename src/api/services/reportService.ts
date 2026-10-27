@@ -2,7 +2,22 @@ import { ENDPOINTS } from "@/api/endpoints";
 import { ENV } from "@/config/env";
 import api from "@/lib/axios";
 import { useAuthStore } from "@/stores/authStore";
+import * as ImageManipulator from "expo-image-manipulator";
 import { Platform } from "react-native";
+
+async function prepareOptimizedImage(uri: string): Promise<string> {
+	try {
+		const manipulated = await ImageManipulator.manipulateAsync(
+			uri,
+			[{ resize: { width: 720 } }],
+			{ compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+		);
+		return manipulated.uri;
+	} catch (e) {
+		console.warn('Image compression fallback:', e);
+		return uri;
+	}
+}
 
 // ============================================================
 // Types
@@ -19,7 +34,10 @@ export interface Report {
 	latitude?: number;
 	longitude?: number;
 	report_img: string;
+	/** Ảnh thu nhỏ (256px) cho marker bản đồ; rỗng nếu server chưa có. */
+	thumb?: string;
 	severity?: string;
+	waste_types?: string[];
 	pointsEarned?: number;
 	newTotal?: number;
 	status?: string;
@@ -36,6 +54,16 @@ export interface ReportImage {
 	[key: string]: unknown;
 }
 
+export interface AiWasteScanResult {
+	points: number;
+	color: string;
+	severity: 'none' | 'low' | 'medium' | 'high' | 'critical' | string;
+	has_waste: boolean;
+	waste_types?: string[];
+	confidence?: number;
+	reason: string;
+}
+
 // CreateReportPayload là FormData được build sẵn từ phía UI
 // (không còn dùng plain object để tránh bug String(file) = "[object Object]")
 export type CreateReportPayload = FormData;
@@ -50,12 +78,19 @@ export const getDaklakMapPageUrl = (): string => `${getDaklakMapUrl().replace(/\
 export const DAKLAK_MAP_URL = getDaklakMapUrl();
 
 const getPhotoImageUrl = (photo: any): string => {
-	const image = photo?.thumb || photo?.image_url || photo?.imageUrl || photo?.url || photo?.original || photo?.thumbnail || (Array.isArray(photo?.photo_urls) && photo.photo_urls[0]);
+	const image = photo?.image_url || photo?.imageUrl || photo?.url || photo?.original || (Array.isArray(photo?.photo_urls) && photo.photo_urls[0]) || photo?.thumb;
 	if (typeof image !== 'string' || !image.trim()) return '';
 	if (/^(https?:|data:|blob:)/i.test(image)) return image;
 	return `${getDaklakMapUrl().replace(/\/$/, '')}/${image.replace(/^\//, '')}`;
 };
 
+/** Ảnh thu nhỏ dùng cho marker trên bản đồ (ưu tiên bản 256px do server lưu). */
+const getPhotoThumbUrl = (photo: any): string => {
+	const thumb = photo?.thumb;
+	if (typeof thumb !== 'string' || !thumb.trim()) return '';
+	if (/^(https?:|data:|blob:)/i.test(thumb)) return thumb;
+	return `${getDaklakMapUrl().replace(/\/$/, '')}/${thumb.replace(/^\//, '')}`;
+};
 /**
  * Cross-platform FormData reader:
  * Web FormData supports fd.get(key), while React Native FormData polyfill stores entries in fd._parts: [ [key, value], ... ]
@@ -78,7 +113,7 @@ export const reportService = {
 	getAll: async (params?: Record<string, unknown>): Promise<Report[]> => {
 		try {
 			const baseUrl = getDaklakMapUrl();
-			const res = await fetch(`${baseUrl}/api/photos`);
+			const res = await fetch(`${baseUrl}/api/photos?_t=${Date.now()}`, { cache: 'no-store' });
 			if (!res.ok) throw new Error('Failed to fetch from Dak Lak map');
 			const json = await res.json();
 			const photos = Array.isArray(json) ? json : (json.photos || []);
@@ -95,7 +130,9 @@ export const reportService = {
 				latitude: Number(p.lat) || 12.6828,
 				longitude: Number(p.lng) || 108.0378,
 				report_img: getPhotoImageUrl(p),
+				thumb: getPhotoThumbUrl(p),
 				severity: p.severity || 'medium',
+				waste_types: Array.isArray(p.waste_types) ? p.waste_types : [],
 				status: p.status || 'reported',
 				reporter: {
 					id: p.userid || 'user-daklak',
@@ -164,6 +201,32 @@ export const reportService = {
 			const severity = (getFormDataValue(formData, 'severity') as string) || 'medium';
 			uploadFormData.append('severity', severity);
 
+			const rawThumb: any = getFormDataValue(formData, 'thumb');
+			if (rawThumb) {
+				if ((rawThumb as Blob).size !== undefined && !rawThumb.uri) {
+					uploadFormData.append('thumb', rawThumb, (rawThumb as File).name || 'thumb.jpg');
+				} else if (Platform.OS === 'web' && rawThumb.uri) {
+					const thumbBlob = await fetch(rawThumb.uri).then((r) => r.blob());
+					uploadFormData.append('thumb', thumbBlob, rawThumb.name || 'thumb.jpg');
+				} else {
+					uploadFormData.append('thumb', rawThumb);
+				}
+			}
+
+			const wasteType = (getFormDataValue(formData, 'waste_type') as string) || (getFormDataValue(formData, 'wasteTypes') as string);
+			if (wasteType) uploadFormData.append('waste_type', wasteType);
+
+			const desc = getFormDataValue(formData, 'description') as string;
+			if (desc) uploadFormData.append('description', desc);
+
+			const aiPoints = getFormDataValue(formData, 'ai_points') as string;
+			if (aiPoints) uploadFormData.append('ai_points', aiPoints);
+			const aiColor = getFormDataValue(formData, 'ai_color') as string;
+			if (aiColor) uploadFormData.append('ai_color', aiColor);
+			const aiSeverity = getFormDataValue(formData, 'ai_severity') as string;
+			if (aiSeverity) uploadFormData.append('ai_severity', aiSeverity);
+			const aiReason = getFormDataValue(formData, 'ai_reason') as string;
+			if (aiReason) uploadFormData.append('ai_reason', aiReason);
 			uploadFormData.append('datetime', new Date().toLocaleString('vi-VN'));
 			uploadFormData.append('model', 'EcoPick App');
 
@@ -186,6 +249,7 @@ export const reportService = {
 				latitude: payload.lat ?? (lat ? parseFloat(lat) : 12.6828),
 				longitude: payload.lng ?? (lng ? parseFloat(lng) : 108.0378),
 				report_img: getPhotoImageUrl(payload),
+				thumb: getPhotoThumbUrl(payload),
 				severity,
 				pointsEarned: Number(payload.pointsEarned || 0),
 				newTotal: Number(payload.newTotal || 0),
@@ -204,13 +268,46 @@ export const reportService = {
 		return { id, ...payload } as any;
 	},
 
-	/** DELETE /api/photos/{id} trên Bản đồ Đắk Lắk */
+	/** DELETE /api/photos/{id} trên Bản đồ Đắk Lắk — chỉ quản trị viên (server trả 403 nếu không). */
 	delete: async (id: string) => {
-		try {
-			const baseUrl = getDaklakMapUrl();
-			await fetch(`${baseUrl}/api/photos/${encodeURIComponent(id)}`, { method: 'DELETE' });
-		} catch (e) {}
+		const baseUrl = getDaklakMapUrl();
+		const token = useAuthStore.getState().token;
+		// Trước đây bỏ qua kết quả nên 401/403 vẫn báo thành công — người dùng tưởng đã xóa.
+		const res = await fetch(`${baseUrl}/api/photos/${encodeURIComponent(id)}`, {
+			method: 'DELETE',
+			headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+		});
+		if (!res.ok) throw new Error('Không thể xóa ảnh (cần quyền quản trị viên)');
 		return { success: true };
+	},
+
+	/** POST /api/ai/scan để thẩm định và chấm điểm ảnh trước khi nộp (đã nén ảnh để giảm độ trễ) */
+	scanWasteImage: async (imageUri: string): Promise<AiWasteScanResult | null> => {
+		try {
+			const optimizedUri = await prepareOptimizedImage(imageUri);
+			const formData = new FormData();
+			const fileName = `scan_${Date.now()}.jpg`;
+			if (Platform.OS === 'web') {
+				const blob = await fetch(optimizedUri).then((r) => r.blob());
+				formData.append('image', blob, fileName);
+			} else {
+				formData.append('image', { uri: optimizedUri, name: fileName, type: 'image/jpeg' } as any);
+			}
+
+			const baseUrl = getDaklakMapUrl();
+			const token = useAuthStore.getState().token;
+			const res = await fetch(`${baseUrl}/api/ai/scan`, {
+				method: 'POST',
+				headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+				body: formData,
+			});
+			if (!res.ok) return null;
+			const json = await res.json();
+			return json?.data ?? json;
+		} catch (err) {
+			console.warn('AI waste scan error:', err);
+			return null;
+		}
 	},
 };
 

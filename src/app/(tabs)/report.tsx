@@ -32,7 +32,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Fonts } from '../../constants';
-import { useCreateReport, useUploadReportImage } from '../../hooks/useReportQueries';
+import { useCreateReport, useUploadReportImage, useAiWasteScan } from '../../hooks/useReportQueries';
+import { type AiWasteScanResult } from '../../api/services/reportService';
 import { useAuthStore } from '../../stores/authStore';
 // 
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -72,6 +73,39 @@ export default function ReportScreen() {
   const [severityValue, setSeverityValue] = useState(0.6); // 0 to 1
   const [selectedWasteTypes, setSelectedWasteTypes] = useState<Set<string>>(new Set(['plastic']));
 
+  // ── AI Evaluation state ──
+  const aiScanMutation = useAiWasteScan();
+  const [aiResult, setAiResult] = useState<AiWasteScanResult | null>(null);
+  const isAiScanning = aiScanMutation.isPending;
+
+  const runAiScan = async (uri: string) => {
+    try {
+      const res = await aiScanMutation.mutateAsync(uri);
+      if (res) {
+        setAiResult(res);
+        if (res.points === 0) {
+          setSeverityValue(0);
+        } else if (res.color === '#10B981') {
+          setSeverityValue(0.2);
+        } else if (res.color === '#F59E0B') {
+          setSeverityValue(0.5);
+        } else {
+          setSeverityValue(0.85);
+        }
+
+        if (Array.isArray(res.waste_types) && res.waste_types.length > 0) {
+          setSelectedWasteTypes(new Set(res.waste_types));
+        }
+
+        if (res.reason) {
+          setDescription((prev) => (prev ? prev : res.reason));
+        }
+      }
+    } catch (e) {
+      console.warn('AI scan error:', e);
+    }
+  };
+
   // ── Location state ──
   const [locationAddress, setLocationAddress] = useState('');
   const [locationLat, setLocationLat] = useState('');
@@ -87,8 +121,9 @@ export default function ReportScreen() {
 
   // Sync image from params
   useEffect(() => {
-    if (params.imageUri) {
+    if (params.imageUri && params.imageUri !== image) {
       setImage(params.imageUri);
+      runAiScan(params.imageUri);
     }
   }, [params.imageUri]);
 
@@ -153,6 +188,7 @@ export default function ReportScreen() {
         const asset = result.assets[0];
         setImage(asset.uri);
         router.setParams({ imageUri: asset.uri });
+        runAiScan(asset.uri);
 
         // Ưu tiên GPS trong EXIF của ảnh — đây mới là vị trí lúc chụp
         const photoGps = extractGpsFromExif(asset.exif);
@@ -221,6 +257,7 @@ export default function ReportScreen() {
   };
 
   const getSeverityLabel = (val: number): string => {
+    if (aiResult && !aiResult.has_waste) return 'Không có rác (0 điểm)';
     if (val < 0.2) return t('severity.minor');
     if (val < 0.4) return t('severity.light');
     if (val < 0.6) return t('severity.moderate');
@@ -230,6 +267,7 @@ export default function ReportScreen() {
 
   // Map slider value (0-1) to API severity string
   const getSeverityApiValue = (val: number): string => {
+    if (aiResult && !aiResult.has_waste) return 'none';
     if (val < 0.25) return 'low';
     if (val < 0.5) return 'medium';
     if (val < 0.75) return 'high';
@@ -238,6 +276,22 @@ export default function ReportScreen() {
 
   const handleSubmit = async () => {
     if (!image) return alert(t('report.takePhotoFirst'));
+    if (isAiScanning) {
+      Toast.show({
+        type: 'info',
+        text1: 'Đang thẩm định ảnh',
+        text2: 'AI đang phân tích hiện trường rác, vui lòng đợi trong giây lát...',
+      });
+      return;
+    }
+    if (aiResult && aiResult.points === 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Không phát hiện rác thải',
+        text2: 'Vui lòng chụp lại ảnh có rác thải thực tế ngoài môi trường.',
+      });
+      return;
+    }
     // Không gửi toạ độ 0/NaN — server sẽ âm thầm ghim về Đắk Lắk
     const lat = Number(locationLat);
     const lng = Number(locationLng);
@@ -248,11 +302,25 @@ export default function ReportScreen() {
     try {
       const { uri } = await ImageManipulator.manipulateAsync(
         image,
-        [{ resize: { width: 1600 } }], // giữ dưới giới hạn 4MB của /api/upload
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+        [{ resize: { width: 1200 } }], // nén kích thước để upload nhanh
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
       );
 
       if (!uri) throw new Error('Image processing failed: URI is empty');
+
+      // Bản thu nhỏ cho marker trên bản đồ: marker chỉ 46px nên ảnh 1600px là phí
+      // băng thông (mỗi lần mở bản đồ tải trọn bộ ảnh). Lỗi ở bước này không chặn upload.
+      let thumbUri = '';
+      try {
+        const thumb = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 256 } }],
+          { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        thumbUri = thumb.uri || '';
+      } catch {
+        // Không có bản thu nhỏ — server sẽ dùng ảnh gốc
+      }
 
       const formData = new FormData();
       const locationName = locationAddress || `${locationLat}, ${locationLng}`;
@@ -270,6 +338,13 @@ export default function ReportScreen() {
       formData.append('status', 'reviewing');
       formData.append('waste_type', Array.from(selectedWasteTypes).join(', '));
 
+      if (aiResult) {
+        formData.append('ai_points', String(aiResult.points));
+        formData.append('ai_color', aiResult.color);
+        formData.append('ai_severity', aiResult.severity);
+        formData.append('ai_reason', aiResult.reason);
+      }
+
       if (description) formData.append('description', description);
       if (locationAddress) formData.append('address', locationAddress);
 
@@ -282,11 +357,21 @@ export default function ReportScreen() {
       } else {
         formData.append('report_img', { uri, name: fileName, type: 'image/jpeg' } as any);
       }
+      if (thumbUri) {
+        const thumbName = `thumb_${Date.now()}.jpg`;
+        if (Platform.OS === 'web') {
+          const blob = await fetch(thumbUri).then((r) => r.blob());
+          formData.append('thumb', blob, thumbName);
+        } else {
+          formData.append('thumb', { uri: thumbUri, name: thumbName, type: 'image/jpeg' } as any);
+        }
+      }
 
       const report = await createReportMutation.mutateAsync(formData);
 
       // Reset form on success
       setImage(null);
+      setAiResult(null);
       setDescription('');
       setSeverityValue(0.6);
       setSelectedWasteTypes(new Set(['plastic']));
@@ -361,8 +446,22 @@ export default function ReportScreen() {
       {/* ─── Top Half: Photo Preview (animated scale) ─── */}
       <View style={styles.photoSection}>
         {image ? (
-          <Animated.View style={[styles.capturedPhotoContainer, animatedPhotoStyle]}>
+          <Animated.View
+            style={[
+              styles.capturedPhotoContainer,
+              animatedPhotoStyle,
+              aiResult?.color ? { borderWidth: 4, borderColor: aiResult.color } : null,
+            ]}
+          >
             <Image source={{ uri: image }} style={styles.capturedPhoto as ImageStyle} resizeMode="cover" />
+            {aiResult && (
+              <View style={[styles.photoPointsBadge, { backgroundColor: aiResult.color }]}>
+                <Ionicons name={aiResult.points > 0 ? 'sparkles' : 'alert-circle'} size={14} color="#FFFFFF" />
+                <Text style={styles.photoPointsBadgeText}>
+                  {aiResult.points > 0 ? `+${aiResult.points} điểm` : '0 điểm'}
+                </Text>
+              </View>
+            )}
           </Animated.View>
         ) : (
           <View style={styles.placeholderContainer}>
@@ -415,6 +514,83 @@ export default function ReportScreen() {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
           >
+            {/* ─── AI Evaluation Banner / Card ─── */}
+            {isAiScanning && (
+              <View style={styles.aiScanningCard}>
+                <ActivityIndicator size="small" color="#20693A" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.aiScanningTitle}>AI đang thẩm định hiện trường...</Text>
+                  <Text style={styles.aiScanningSubtitle}>Nhận diện rác và tính điểm tự động</Text>
+                </View>
+              </View>
+            )}
+
+            {!isAiScanning && aiResult && aiResult.points === 0 && (
+              <View style={styles.noWasteCard}>
+                <View style={styles.noWasteHeader}>
+                  <View style={styles.noWasteIconBadge}>
+                    <Ionicons name="alert-circle" size={22} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.noWasteTitle}>KHÔNG PHÁT HIỆN RÁC THẢI</Text>
+                    <Text style={styles.noWasteSubtitle}>0 điểm • Không tải lên bản đồ</Text>
+                  </View>
+                </View>
+                <Text style={styles.noWasteReason}>{aiResult.reason}</Text>
+                <Text style={styles.noWasteHelpText}>
+                  EcoPick chỉ cộng điểm và ghi nhận lên bản đồ khi phát hiện rác thải thực tế ngoài môi trường. Vui lòng chụp lại ảnh có rác thải.
+                </Text>
+                <TouchableOpacity
+                  style={styles.noWasteRetakeBtn}
+                  onPress={takePhoto}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="camera-reverse" size={16} color="#FFFFFF" />
+                  <Text style={styles.noWasteRetakeBtnText}>Chụp lại ảnh ngay</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {!isAiScanning && aiResult && aiResult.points > 0 && (
+              <View
+                style={[
+                  styles.aiResultCard,
+                  {
+                    borderColor: aiResult.color,
+                    borderWidth: 2,
+                    backgroundColor: `${aiResult.color}14`,
+                  },
+                ]}
+              >
+                <View style={styles.aiHeaderRow}>
+                  <View style={[styles.aiIconBadge, { backgroundColor: aiResult.color }]}>
+                    <Ionicons
+                      name="sparkles"
+                      size={18}
+                      color="#FFFFFF"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.aiTitleRow}>
+                      <Text style={[styles.aiSuccessTitle, { color: aiResult.color }]}>
+                        {aiResult.color === '#10B981'
+                          ? 'MỨC ĐỘ NHẸ'
+                          : aiResult.color === '#F59E0B'
+                          ? 'MỨC ĐỘ TRUNG BÌNH'
+                          : 'MỨC ĐỘ NGHIÊM TRỌNG'}
+                      </Text>
+                      <View style={[styles.pointsBadge, { backgroundColor: aiResult.color }]}>
+                        <Text style={styles.pointsBadgeText}>
+                          +{aiResult.points} điểm
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.aiResultReason}>{aiResult.reason}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
             {/* ─── Location Section (Tappable) ─── */}
             <TouchableOpacity
               style={styles.locationCard}
@@ -534,21 +710,41 @@ export default function ReportScreen() {
             styles.submitBarContainer,
             keyboardVisible && styles.submitBarCompact,
           ]}>
-            <TouchableOpacity
-              style={[styles.submitBtn, (!image || isSubmitting) && styles.submitBtnDisabled]}
-              onPress={handleSubmit}
-              activeOpacity={0.8}
-              disabled={!image || isSubmitting}
-            >
-              {isSubmitting ? (
+            {aiResult && aiResult.points === 0 ? (
+              <TouchableOpacity
+                style={[styles.submitBtn, styles.submitBtnNoWaste]}
+                onPress={takePhoto}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="camera" size={18} color="#FFFFFF" />
+                <Text style={styles.submitBtnText}>Không có rác — Chụp lại ảnh</Text>
+              </TouchableOpacity>
+            ) : isAiScanning ? (
+              <TouchableOpacity
+                style={[styles.submitBtn, styles.submitBtnDisabled]}
+                disabled={true}
+                activeOpacity={0.8}
+              >
                 <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" />
-              )}
-              <Text style={styles.submitBtnText}>
-                {isSubmitting ? t('common.loading') : t('report.submitReport')}
-              </Text>
-            </TouchableOpacity>
+                <Text style={styles.submitBtnText}>AI đang thẩm định ảnh...</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.submitBtn, (!image || isSubmitting) && styles.submitBtnDisabled]}
+                onPress={handleSubmit}
+                activeOpacity={0.8}
+                disabled={!image || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" />
+                )}
+                <Text style={styles.submitBtnText}>
+                  {isSubmitting ? t('common.loading') : t('report.submitReport')}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Animated.View>
@@ -913,5 +1109,203 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: '#FFFFFF',
     textAlign: 'center',
+  },
+
+  // ─── AI Evaluation Styles ───
+  aiScanningCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+  aiScanningTitle: {
+    fontFamily: Fonts.semiBold,
+    fontSize: 13,
+    color: '#166534',
+  },
+  aiScanningSubtitle: {
+    fontFamily: Fonts.regular,
+    fontSize: 11,
+    color: '#15803D',
+    marginTop: 2,
+  },
+  aiResultCard: {
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  aiSuccessCard: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+  },
+  aiWarningCard: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  aiHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  aiTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  photoPointsBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  photoPointsBadgeText: {
+    fontFamily: Fonts.bold,
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
+  aiIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiIconBadgeSuccess: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(32, 105, 58, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiIconBadgeWarning: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(220, 38, 38, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiSuccessTitle: {
+    fontFamily: Fonts.bold,
+    fontSize: 13,
+    color: '#166534',
+  },
+  aiWarningTitle: {
+    fontFamily: Fonts.bold,
+    fontSize: 13,
+    color: '#991B1B',
+  },
+  pointsBadge: {
+    backgroundColor: '#20693A',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  pointsBadgeText: {
+    fontFamily: Fonts.bold,
+    fontSize: 11,
+    color: '#FFFFFF',
+  },
+  aiResultReason: {
+    fontFamily: Fonts.regular,
+    fontSize: 12,
+    color: '#334155',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  aiWarningNotice: {
+    fontFamily: Fonts.medium,
+    fontSize: 11,
+    color: '#B91C1C',
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(239, 68, 68, 0.15)',
+    paddingTop: 6,
+  },
+  noWasteCard: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  noWasteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  noWasteIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noWasteTitle: {
+    fontFamily: Fonts.bold,
+    fontSize: 13,
+    color: '#991B1B',
+    letterSpacing: 0.3,
+  },
+  noWasteSubtitle: {
+    fontFamily: Fonts.semiBold,
+    fontSize: 11,
+    color: '#DC2626',
+    marginTop: 1,
+  },
+  noWasteReason: {
+    fontFamily: Fonts.semiBold,
+    fontSize: 13,
+    color: '#7F1D1D',
+    marginTop: 10,
+    lineHeight: 18,
+  },
+  noWasteHelpText: {
+    fontFamily: Fonts.regular,
+    fontSize: 11.5,
+    color: '#991B1B',
+    marginTop: 6,
+    lineHeight: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    padding: 8,
+    borderRadius: 8,
+  },
+  noWasteRetakeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#DC2626',
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  noWasteRetakeBtnText: {
+    fontFamily: Fonts.bold,
+    fontSize: 13,
+    color: '#FFFFFF',
+  },
+  submitBtnNoWaste: {
+    backgroundColor: '#DC2626',
   },
 });

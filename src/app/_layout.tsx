@@ -71,6 +71,33 @@ export default function RootLayout() {
     loadSavedLanguage();
     useAuthStore.getState().loadStoredAuth();
     void useThemeStore.getState().loadTheme().finally(() => setThemeLoaded(true));
+    if (typeof document !== 'undefined') {
+      const linkId = 'ecopick-custom-fonts';
+      if (!document.getElementById(linkId)) {
+        const link = document.createElement('link');
+        link.id = linkId;
+        link.rel = 'stylesheet';
+        link.href =
+          'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Inter:ital,opsz,wght@0,14..32,300..800;1,14..32,300..800&display=swap';
+        document.head.appendChild(link);
+
+        const style = document.createElement('style');
+        style.id = 'ecopick-typography-reset';
+        style.textContent = `
+          html, body, #root, input, textarea, select, button {
+            font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+          }
+          [dir="auto"]:not([style*="Ionicons" i]):not([style*="ionicons" i]):not([style*="Material" i]):not([style*="FontAwesome" i]):not([style*="Feather" i]):not([style*="Entypo" i]):not([style*="Octicons" i]):not([style*="AntDesign" i]):not([style*="SimpleLineIcons" i]) {
+            font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
   }, []);
 
   // Theme là lựa chọn thủ công trong app, không theo OS. Ép native components

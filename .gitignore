@@ -54,3 +54,12 @@ ruvector.db
 .codex/
 # Claude Flow runtime data
 # Environment variables
+
+# Local assistant configuration & temporary reports
+CLAUDE.md
+AGENTS.md
+HANDOVER_REPORT_CLAUDE.md
+
+# Local mock API server + runtime data (chứa credential plaintext, dữ liệu tạm)
+mock-server.js
+mock-db.json

@@ -61,8 +61,8 @@ export function FilterSheet({
     onClose();
   }, [onClose]);
 
-  if (!visible) return null;
-
+  // Hai hook dưới phải nằm TRƯỚC `return null` — đặt sau sẽ đổi số lượng hook
+  // giữa hai lần render và React ném "Rendered more hooks than during the previous render".
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.35} pressBehavior="close" />
@@ -76,6 +76,8 @@ export function FilterSheet({
     },
     [onClose],
   );
+
+  if (!visible) return null;
 
   return (
     <BottomSheetLib
