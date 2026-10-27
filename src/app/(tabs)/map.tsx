@@ -808,23 +808,25 @@ export default function MapScreen() {
 
       {/* Top overlay — Search + Severity Chips (hide when routing) */}
       {!isRouting && (
-        <View style={[styles.topOverlay, { paddingTop: insets.top + 24 }]} pointerEvents="box-none">
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onFilterPress={handleFilterPress}
-            onFocus={handleSearchFocus}
-          />
-          <View style={styles.filtersRow} pointerEvents="box-none">
-            {SEVERITY_FILTERS.map((filter) => (
-              <SeverityChip
-                key={filter.key}
-                severity={filter.key}
-                label={filter.label}
-                selected={filters.severity.includes(filter.key)}
-                onPress={() => toggleSeverityFilter(filter.key)}
-              />
-            ))}
+        <View style={[styles.topOverlay, { paddingTop: insets.top + 16 }]} pointerEvents="box-none">
+          <View style={styles.topOverlayInner} pointerEvents="box-none">
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onFilterPress={handleFilterPress}
+              onFocus={handleSearchFocus}
+            />
+            <View style={styles.filtersRow} pointerEvents="box-none">
+              {SEVERITY_FILTERS.map((filter) => (
+                <SeverityChip
+                  key={filter.key}
+                  severity={filter.key}
+                  label={filter.label}
+                  selected={filters.severity.includes(filter.key)}
+                  onPress={() => toggleSeverityFilter(filter.key)}
+                />
+              ))}
+            </View>
           </View>
         </View>
       )}
@@ -909,10 +911,15 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
+    alignItems: 'center',
     paddingHorizontal: Spacing.base,
     paddingBottom: Spacing.base,
-    gap: 12,
     zIndex: 10,
+  },
+  topOverlayInner: {
+    width: '100%',
+    maxWidth: 680,
+    gap: 12,
   },
   filtersRow: {
     flexDirection: 'row',

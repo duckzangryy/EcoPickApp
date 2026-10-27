@@ -314,35 +314,38 @@ export default function ProfileScreen() {
     <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
 
-      {/* ─── Floating Header (appears on scroll) ─── */}
-      <Animated.View
-        style={[
-          styles.floatingHeader,
-          {
-            paddingTop: insets.top,
-            opacity: headerBgOpacity,
-            backgroundColor: colors.background,
-          },
-        ]}
-      >
-        <View style={styles.floatingHeaderInner}>
-          <Text style={[styles.floatingHeaderTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-            {displayName}
-          </Text>
-        </View>
-      </Animated.View>
-
-      {/* ─── Top Action Buttons (always visible) ─── */}
-      <View style={[styles.topActions, { top: insets.top }]}>
-        <View style={styles.topActionSpacer} />
-        <View style={styles.topActionsRight}>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/settings')}>
-            <Animated.View style={[styles.topActionBtn, { backgroundColor: settingsBtnBg }]}>
-              <Animated.Text style={{ color: settingsIconColor }}>
-                <Ionicons name="settings-outline" size={20} />
-              </Animated.Text>
-            </Animated.View>
-          </TouchableOpacity>
+      {/* ─── Unified Floating Header Bar (Always structured, animates smoothly on scroll) ─── */}
+      <View style={[styles.floatingHeaderWrapper, { paddingTop: insets.top }]} pointerEvents="box-none">
+        <Animated.View
+          style={[
+            styles.floatingHeaderBg,
+            {
+              opacity: headerBgOpacity,
+              backgroundColor: colors.card,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        />
+        <View style={styles.floatingHeaderInner} pointerEvents="box-none">
+          <View style={styles.headerActionSlot} />
+          <Animated.View style={[styles.headerTitleWrap, { opacity: headerBgOpacity }]} pointerEvents="none">
+            <Text style={[styles.floatingHeaderTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+              {displayName}
+            </Text>
+          </Animated.View>
+          <View style={styles.headerActionSlot}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => router.push('/settings')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Animated.View style={[styles.topActionBtn, { backgroundColor: settingsBtnBg }]}>
+                <Animated.Text style={{ color: settingsIconColor }}>
+                  <Ionicons name="settings-outline" size={20} />
+                </Animated.Text>
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -568,65 +571,71 @@ const styles = StyleSheet.create({
   },
 
   // ─── Floating Header ───
-  floatingHeader: {
+  floatingHeaderWrapper: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     zIndex: 100,
-    backgroundColor: Colors.background,
+    alignItems: 'center',
+    width: '100%',
+  },
+  floatingHeaderBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.primaryBorder,
   },
   floatingHeaderInner: {
+    width: '100%',
+    maxWidth: 768,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.base,
-    paddingVertical: 12,
+    height: 52,
+  },
+  headerActionSlot: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
   floatingHeaderTitle: {
     fontFamily: Fonts.bold,
     fontSize: FontSizes.lg,
     color: Colors.textPrimary,
-    letterSpacing: -0.5,
-  },
-
-  // ─── Top Actions (over banner) ───
-  topActions: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 101,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base,
-    maxWidth: 768,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  topActionSpacer: {
-    width: 40,
-  },
-  topActionsRight: {
-    flexDirection: 'row',
-    gap: 8,
+    letterSpacing: -0.4,
+    textAlign: 'center',
   },
   topActionBtn: {
     width: 40,
     height: 40,
     borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(0,0,0,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.2,
         shadowRadius: 4,
       },
       android: { elevation: 4 },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
     }),
   },
 

@@ -232,12 +232,14 @@ export default function BadgesScreen() {
 
       {/* ─── Header ─── */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('badges.title')}</Text>
-        <View style={[styles.headerBadgeCount, { backgroundColor: colors.primaryLight } ]}>
-          <Ionicons name="trophy" size={14} color={colors.primary} />
-          <Text style={[styles.headerBadgeCountText, { color: colors.primary } ]}>
-            {t('badges.headerCount', { earned: earnedCount, total: totalCount })}
-          </Text>
+        <View style={styles.headerInner}>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('badges.title')}</Text>
+          <View style={[styles.headerBadgeCount, { backgroundColor: colors.primaryLight } ]}>
+            <Ionicons name="trophy" size={14} color={colors.primary} />
+            <Text style={[styles.headerBadgeCountText, { color: colors.primary } ]}>
+              {t('badges.headerCount', { earned: earnedCount, total: totalCount })}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -467,14 +469,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
+    width: '100%',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.primaryBorder,
+  },
+  headerInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.base,
-    backgroundColor: 'rgba(246,248,247,0.95)',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.primaryBorder,
     width: '100%',
     maxWidth: 768,
     alignSelf: 'center',

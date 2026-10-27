@@ -246,15 +246,14 @@ export default function TabLayout() {
           name="report"
           options={{
             title: t('tabs.report'),
+            tabBarAccessibilityLabel: t('tabs.report'),
             tabBarStyle: { display: 'none' },
             tabBarIcon: () => (
               <View style={styles.floatingReportBtn}>
-                <Ionicons name="camera-outline" size={30} color={Colors.white} />
+                <Ionicons name="camera" size={28} color={Colors.white} />
               </View>
             ),
-            tabBarLabel: ({ color }) => (
-              <Text style={[styles.tabBarLabel, { color, marginTop: 12 }]}>{t('tabs.report')}</Text>
-            ),
+            tabBarLabel: () => null,
           }}
           listeners={{
             tabPress: handleReportPress,
@@ -322,14 +321,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    // height: Platform.OS === 'ios' ? 85 : 70,
-    paddingTop: 13,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -25 },
-    shadowOpacity: 0.25,
-    shadowRadius: 50,
-    elevation: 30,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+      },
+      android: { elevation: 12 },
+      default: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+      },
+    }),
   },
   tabBarLabel: {
     fontFamily: Fonts.medium,
@@ -338,17 +346,27 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   floatingReportBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: Colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 10,
+    marginBottom: Platform.OS === 'ios' ? 22 : 18,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.accent,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.45,
+        shadowRadius: 12,
+      },
+      android: { elevation: 8 },
+      default: {
+        shadowColor: Colors.accent,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.45,
+        shadowRadius: 12,
+      },
+    }),
   },
 });
