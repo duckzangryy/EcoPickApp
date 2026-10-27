@@ -112,16 +112,16 @@ async function handleDomain(req, res, path, method, database, url) {
   if (eventAction && method === 'POST') {
     const auth = user || currentUser(req, res);
     if (!auth) return true;
-    const participantId = `ep-${crypto.randomUUID()}`;
+    const participantId = `ep-${auth.userId}-${eventAction[1]}`;
     if (eventAction[2] === 'join') {
       const result = await joinEvent(database, auth.userId, eventAction[1]);
       return json(res, 200, { success: true, data: { message: 'Đã tham gia sự kiện thành công!', ...result }, ...result });
     }
-    const [existing] = await database`SELECT id FROM app_data WHERE collection='event_participants' AND data->>'event'=${eventAction[1]} AND data->>'user'=${auth.userId}`;
-    if (!existing) {
-      const participant = { id: participantId, event: eventAction[1], user: auth.userId, status: 'checked_in', joined_at: new Date().toISOString() };
-      await database`INSERT INTO app_data(collection,id,user_id,data) VALUES('event_participants',${participant.id},${auth.userId},${JSON.stringify(participant)}::jsonb)`;
-    }
+    await database`INSERT INTO app_data(collection,id,user_id,data)
+      VALUES('event_participants',${participantId},${auth.userId},${JSON.stringify({
+        id: participantId, event: eventAction[1], user: auth.userId, status: 'checked_in', joined_at: new Date().toISOString(),
+      })}::jsonb)
+      ON CONFLICT (collection,id) DO NOTHING`;
     return json(res, 200, { success: true, data: { message: 'Đã điểm danh sự kiện!' } });
   }
 
@@ -231,6 +231,15 @@ async function handleDomain(req, res, path, method, database, url) {
         if (eventId) {
           values = values.filter((item) => item.event === eventId || item.event_id === eventId);
         }
+        // Mỗi user chỉ xuất hiện một lần trong danh sách (row mới nhất thắng)
+        const seenUsers = new Set();
+        values = values.filter((item) => {
+          const uid = item.user || item.user_id;
+          if (!uid) return true;
+          if (seenUsers.has(uid)) return false;
+          seenUsers.add(uid);
+          return true;
+        });
         const userIds = [...new Set(values.map((v) => v.user || v.user_id).filter(Boolean))];
         let usersMap = {};
         if (userIds.length > 0) {
@@ -241,11 +250,11 @@ async function handleDomain(req, res, path, method, database, url) {
           const u = usersMap[item.user || item.user_id] || {};
           return {
             ...item,
-            participant: item.participant || {
+            participant: {
               id: u.id || item.user,
-              fullname: u.fullname || 'Người dùng EcoPick',
-              email: u.email || '',
-              avatar: u.avatar || '',
+              fullname: u.fullname || item.participant?.fullname || 'Người dùng EcoPick',
+              email: u.email || item.participant?.email || '',
+              avatar: u.avatar || item.participant?.avatar || '',
             },
           };
         });
@@ -329,6 +338,31 @@ async function handleDomain(req, res, path, method, database, url) {
       // Cấp điểm đúng một lần mỗi người/sự kiện (idempotent)
       const result = await joinEvent(database, user.userId, eventId);
       return json(res, 201, { ...created, id: newId, ...result });
+    }
+    if (name === 'likes') {
+      // Một like duy nhất mỗi user/post (idempotent, toggle không tạo trùng)
+      const postId = String(created.post_id || created.post || '');
+      if (!postId) return fail(res, 400, 'VALIDATION_ERROR', 'post_id bắt buộc');
+      const likeId = `like-${user.userId}-${postId}`;
+      const [inserted] = await database`INSERT INTO app_data(collection,id,user_id,data)
+        VALUES('likes',${likeId},${user.userId},${JSON.stringify({ id: likeId, post_id: postId, user_id: user.userId, created_at: created.created_at })}::jsonb)
+        ON CONFLICT (collection,id) DO NOTHING RETURNING id`;
+      if (inserted) {
+        await database`UPDATE app_data SET data=jsonb_set(data,'{likes_count}',(((data->>'likes_count')::int + 1)::text)::jsonb)
+          WHERE collection='posts' AND id=${postId}`;
+      }
+      const [post] = await database`SELECT data FROM app_data WHERE collection='posts' AND id=${postId}`;
+      return json(res, 201, { ...created, id: likeId, likes_count: post?.data?.likes_count ?? 0 });
+    }
+    if (name === 'conversation_members') {
+      // Một thành viên duy nhất mỗi user/conversation
+      const convId = String(created.conversation_id || created.conversation || '');
+      if (!convId) return fail(res, 400, 'VALIDATION_ERROR', 'conversation_id bắt buộc');
+      const memberId = `cm-${convId}-${user.userId}`;
+      const [inserted] = await database`INSERT INTO app_data(collection,id,user_id,data)
+        VALUES('conversation_members',${memberId},${user.userId},${JSON.stringify({ id: memberId, conversation_id: convId, user_id: user.userId, joined_at: created.created_at })}::jsonb)
+        ON CONFLICT (collection,id) DO NOTHING RETURNING id`;
+      return json(res, 201, { ...created, id: memberId, deduped: !inserted });
     }
     if (name === 'messages') {
       const [membership] = await database`SELECT id FROM app_data WHERE collection='conversation_members' AND data->>'conversation_id'=${created.conversation_id} AND data->>'user_id'=${user.userId}`;

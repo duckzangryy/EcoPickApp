@@ -101,6 +101,7 @@ export const useJoinEvent = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.events.participants.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.events.lists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.events.details() });
     },
   });
 };
@@ -114,6 +115,7 @@ export const useLeaveEvent = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.events.participants.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.events.lists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.events.details() });
     },
   });
 };

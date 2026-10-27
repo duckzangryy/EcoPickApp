@@ -86,7 +86,7 @@ function tokenFor(user) {
   );
 }
 
-function userShape(row) {
+function userShape(row, socialCounts) {
   if (!row) return null;
   return {
     id: row.id,
@@ -103,15 +103,26 @@ function userShape(row) {
     total_reports: row.total_reports,
     total_events: row.total_events,
     total_trees: row.total_trees,
-    followers_count: 0,
-    follower_count: 0,
-    following_count: 0,
+    followers_count: socialCounts?.followers ?? 0,
+    follower_count: socialCounts?.followers ?? 0,
+    following_count: socialCounts?.following ?? 0,
     is_verified: row.is_verified,
     is_active: row.is_active,
     is_staff: row.is_staff,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+/** Đếm follower/following thật từ collection 'follows' (id: follow-{follower}-{target}). */
+async function socialCounts(database, userId) {
+  if (!userId) return { followers: 0, following: 0 };
+  const [row] = await database`
+    SELECT
+      count(*) FILTER (WHERE data->>'user_id' = ${userId})::int AS followers,
+      count(*) FILTER (WHERE user_id = ${userId})::int AS following
+    FROM app_data WHERE collection='follows'`;
+  return { followers: row?.followers ?? 0, following: row?.following ?? 0 };
 }
 
 async function parseMultipart(req) {
@@ -257,8 +268,7 @@ async function leaveEvent(database, userId, participantId) {
 }
 
 module.exports = {
-  sql,
-  POINTS_BY_SEVERITY,
+  sql,  POINTS_BY_SEVERITY,
   DOMAIN_ERRORS,
   failDomain,
   json,
@@ -267,6 +277,7 @@ module.exports = {
   currentUser,
   tokenFor,
   userShape,
+  socialCounts,
   parseMultipart,
   uploadImage,
   createReport,

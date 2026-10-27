@@ -22,7 +22,7 @@ import { Colors, Fonts } from '../../constants';
 import { getColors } from '@/constants/Colors';
 import { useThemeStore } from '@/stores/themeStore';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
-import { useEvents } from '../../hooks/useEventQueries';
+import { useEvents, useEventParticipantsByUser } from '../../hooks/useEventQueries';
 import { useAuthStore } from '../../stores/authStore';
 
 const TAB_KEYS = ['upcoming', 'myEvents', 'past'] as const;
@@ -140,6 +140,11 @@ export default function EventsScreen() {
 
   // ── Fetch events from API ──
   const { data: apiEvents = [], isLoading, isRefetching, isError, refetch } = useEvents();
+  const { data: myParticipants = [] } = useEventParticipantsByUser(user?.id);
+  const joinedEventIds = useMemo(
+    () => new Set(myParticipants.map((p) => p.event).filter(Boolean)),
+    [myParticipants],
+  );
 
   const filteredEvents = useMemo(() => {
     let list = apiEvents;
@@ -242,8 +247,29 @@ export default function EventsScreen() {
                   );
                 })()}
               </View>
-              <TouchableOpacity style={[styles.joinButton, { backgroundColor: colors.primary }]} onPress={() => handleJoinEvent(item)} activeOpacity={0.8}>
-                <Text style={styles.joinButtonText}>{t('events.join')}</Text>
+              <TouchableOpacity
+                style={[
+                  styles.joinButton,
+                  joinedEventIds.has(item.id)
+                    ? { backgroundColor: colors.primaryLight, borderWidth: 1.5, borderColor: colors.primary }
+                    : { backgroundColor: colors.primary },
+                ]}
+                onPress={() => handleJoinEvent(item)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={joinedEventIds.has(item.id) ? 'checkmark' : 'add'}
+                  size={14}
+                  color={joinedEventIds.has(item.id) ? colors.primary : '#fff'}
+                />
+                <Text
+                  style={[
+                    styles.joinButtonText,
+                    { color: joinedEventIds.has(item.id) ? colors.primary : '#fff' },
+                  ]}
+                >
+                  {joinedEventIds.has(item.id) ? t('eventDetail.joined', { defaultValue: 'Đã tham gia' }) : t('events.join')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -656,6 +682,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 14,
     flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     shadowColor: '#20693A',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,

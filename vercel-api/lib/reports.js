@@ -43,6 +43,27 @@ async function handleReports(req, res, path, method, database) {
     if (!auth) return;
     const id = reportMutation[1];
     if (reportMutation[2] === 'upvote' && ['POST', 'DELETE'].includes(method)) {
+      // Ghi nhận ai đã upvote để chặn upvote lặp và cho client render trạng thái đã upvote
+      const upvoteId = `up-${auth.userId}-${id}`;
+      if (method === 'POST') {
+        const [inserted] = await database`INSERT INTO app_data(collection,id,user_id,data)
+          VALUES('report_upvotes',${upvoteId},${auth.userId},${JSON.stringify({ id: upvoteId, report_id: id, user_id: auth.userId, created_at: new Date().toISOString() })}::jsonb)
+          ON CONFLICT (collection,id) DO NOTHING RETURNING id`;
+        if (!inserted) {
+          const [current] = await database`SELECT upvote_count FROM reports WHERE id=${id}`;
+          return current
+            ? json(res, 200, { success: true, data: { upvoteCount: current.upvote_count, alreadyUpvoted: true } })
+            : fail(res, 404, 'NOT_FOUND', 'Không tìm thấy báo cáo');
+        }
+      } else {
+        const [removed] = await database`DELETE FROM app_data WHERE collection='report_upvotes' AND id=${upvoteId} RETURNING id`;
+        if (!removed) {
+          const [current] = await database`SELECT upvote_count FROM reports WHERE id=${id}`;
+          return current
+            ? json(res, 200, { success: true, data: { upvoteCount: current.upvote_count } })
+            : fail(res, 404, 'NOT_FOUND', 'Không tìm thấy báo cáo');
+        }
+      }
       const [row] = await database`UPDATE reports SET upvote_count=GREATEST(0,upvote_count+${method === 'POST' ? 1 : -1}),updated_at=now() WHERE id=${id} RETURNING upvote_count`;
       return row ? json(res, 200, { success: true, data: { upvoteCount: row.upvote_count } }) : fail(res, 404, 'NOT_FOUND', 'Không tìm thấy báo cáo');
     }

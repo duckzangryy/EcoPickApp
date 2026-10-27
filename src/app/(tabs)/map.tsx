@@ -577,6 +577,11 @@ export default function MapScreen() {
           if (data.reportId) {
             router.push(`/location/${data.reportId}`);
           }
+        } else if (data.type === 'ECOPICK_MAP_PRESS') {
+          if (selectedMarker) {
+            selectMarker(null);
+            markerSheetRef.current?.dismiss();
+          }
         }
       } catch (err) {
         console.warn('Error handling postMessage from map:', err);
@@ -587,7 +592,7 @@ export default function MapScreen() {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [reportsWithDistance, selectMarker, router]);
+  }, [reportsWithDistance, selectMarker, selectedMarker, router]);
 
 
   const handleStartDirections = useCallback(

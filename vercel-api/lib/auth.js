@@ -8,6 +8,7 @@ const {
   currentUser,
   tokenFor,
   userShape,
+  socialCounts,
   parseMultipart,
   uploadImage,
 } = require('./helpers');
@@ -57,7 +58,8 @@ async function handleAuth(req, res, path, method, database) {
     if (!row || !(await bcrypt.compare(String(body.password || ''), row.password_hash))) {
       return fail(res, 401, 'INVALID_CREDENTIALS', 'Email hoặc mật khẩu không chính xác');
     }
-    const user = userShape(row);
+    const social = await socialCounts(database, row.id);
+    const user = userShape(row, social);
     const accessToken = tokenFor(user);
     const refreshToken = jwt.sign({ userId: user.id, email: user.email, type: 'refresh' }, process.env.JWT_SECRET, {
       expiresIn: '30d',
@@ -140,7 +142,8 @@ async function handleAuth(req, res, path, method, database) {
     if (method === 'GET') {
       const [row] = await database`SELECT * FROM users WHERE id=${auth.userId}`;
       if (!row) return fail(res, 404, 'NOT_FOUND', 'Không tìm thấy tài khoản');
-      const user = userShape(row);
+      const social = await socialCounts(database, auth.userId);
+      const user = userShape(row, social);
       return json(res, 200, {
         success: true,
         data: {
@@ -149,8 +152,8 @@ async function handleAuth(req, res, path, method, database) {
             totalReports: user.total_reports,
             totalEvents: user.total_events,
             treesPlanted: user.total_trees,
-            followerCount: 0,
-            followingCount: 0,
+            followerCount: social.followers,
+            followingCount: social.following,
           },
         },
         ...user,
@@ -160,7 +163,8 @@ async function handleAuth(req, res, path, method, database) {
       const body = await bodyJson(req);
       const fullName = body.fullname || body.fullName;
       const [row] = await database`UPDATE users SET fullname=COALESCE(${fullName || null},fullname), avatar=COALESCE(${body.avatarUrl || body.avatar || null},avatar), bio=COALESCE(${body.bio || null},bio), updated_at=now() WHERE id=${auth.userId} RETURNING *`;
-      return json(res, 200, { success: true, data: userShape(row), ...userShape(row) });
+      const social = await socialCounts(database, auth.userId);
+      return json(res, 200, { success: true, data: userShape(row, social), ...userShape(row, social) });
     }
     return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Method not allowed');
   }

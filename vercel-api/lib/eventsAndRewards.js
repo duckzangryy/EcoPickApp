@@ -169,15 +169,18 @@ async function handleEventsAndRewards(req, res, path, method, database) {
     if (!body.user_id || !body.badge_id) return fail(res, 400, 'VALIDATION_ERROR', 'user_id và badge_id bắt buộc');
     const [badge] = await database`SELECT data FROM app_data WHERE collection='badges' AND id=${body.badge_id}`;
     if (!badge) return fail(res, 404, 'NOT_FOUND', 'Không tìm thấy huy hiệu');
+    // Một huy hiệu duy nhất mỗi user/badge (idempotent)
     const item = {
-      id: `ub-${crypto.randomUUID()}`,
+      id: `ub-${body.user_id}-${body.badge_id}`,
       user_id: String(body.user_id),
       badge_id: String(body.badge_id),
       badge: badge.data,
       awarded_at: new Date().toISOString(),
     };
-    await database`INSERT INTO app_data(collection,id,user_id,data) VALUES('user_badges',${item.id},${item.user_id},${JSON.stringify(item)}::jsonb)`;
-    return json(res, 201, item);
+    const [inserted] = await database`INSERT INTO app_data(collection,id,user_id,data)
+      VALUES('user_badges',${item.id},${item.user_id},${JSON.stringify(item)}::jsonb)
+      ON CONFLICT (collection,id) DO NOTHING RETURNING id`;
+    return json(res, inserted ? 201 : 200, item);
   }
   const userBadgeDelete = path.match(/^\/api\/badge\/user-badges\/([^/]+)$/);
   if (userBadgeDelete && method === 'DELETE') {

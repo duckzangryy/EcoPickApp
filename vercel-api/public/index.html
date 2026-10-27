@@ -144,8 +144,9 @@ function renderMarkers(){
   Object.values(markers).forEach(m=>map.removeLayer(m));markers={};
   photos.forEach(p=>{
     if(!p.lat) return;
-    const m = L.marker([p.lat,p.lng],{icon:photoIcon(p)}).addTo(map).bindPopup(popupHtml(p));
+    const m = L.marker([p.lat,p.lng],{icon:photoIcon(p)}).addTo(map);
     m.on('click', () => {
+      map.closePopup();
       send({type:'ECOPICK_SELECT_REPORT', reportId: p.id, photo: p});
     });
     markers[p.id]=m;
