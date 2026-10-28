@@ -95,6 +95,19 @@ export const userService = {
     return Array.isArray(result) ? result : [];
   },
   uploadAvatar: async (avatarUrl: string) => unwrap(await api.post(ENDPOINTS.USERS.AVATAR, { avatarUrl })),
+  /** POST/DELETE follow – server trả { isFollowing } */
+  setFollowing: async (id: string, follow: boolean) => {
+    const { data } = await api.request({ url: ENDPOINTS.USERS.FOLLOW(id), method: follow ? 'POST' : 'DELETE' });
+    return ((data as any)?.data ?? data) as { isFollowing: boolean };
+  },
+  getLeaderboard: async (period: 'weekly' | 'monthly' | 'all' = 'all') => {
+    const result = unwrap<any>(await api.get(ENDPOINTS.GAMIFICATION.LEADERBOARD, { params: { period } }));
+    return (result?.leaderboard ?? result ?? []) as Array<{ rank: number; id: string; fullName: string; avatarUrl?: string; ecoPoints: number; level?: number; reportsCount?: number }>;
+  },
+  getStreak: async () => {
+    const result = unwrap<any>(await api.get(ENDPOINTS.GAMIFICATION.STREAK));
+    return (result ?? { streak: 0, activeDays: 0, lastActive: null }) as { streak: number; activeDays: number; lastActive: string | null };
+  },
   getAll: async (params?: Record<string, unknown>): Promise<UserListItem[]> => {
     const result = unwrap<any>(await api.get(ENDPOINTS.USERS.LIST, { params }));
     return Array.isArray(result) ? result : [];

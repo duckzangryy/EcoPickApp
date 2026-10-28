@@ -96,6 +96,7 @@ export const ENDPOINTS = {
 	// ── 7. Gamification (04-BACKEND-API.md Section 3.9) ───────────
 	GAMIFICATION: {
 		LEADERBOARD: "/api/v1/leaderboard",
+		STREAK: "/api/v1/users/me/streak",
 		CHALLENGES: "/api/v1/challenges/daily",
 		POINTS_HISTORY: "/api/v1/points/history",
 		REWARDS: "/api/v1/rewards",

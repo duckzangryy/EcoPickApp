@@ -1,15 +1,17 @@
 
 import React from 'react';
 import { Image, StyleSheet, View } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../../../constants';
+import { Colors, Fonts, Spacing, getColors } from '../../../../constants';
+import { useThemeStore } from '../../../../stores/themeStore';
 
 interface LocationHeroProps {
   imageUrl?: string;
 }
 
 const LocationHero = ({ imageUrl }: LocationHeroProps) => {
+  const colors = getColors(useThemeStore((s) => s.theme));
   return (
-    <View style={s.heroContainer}>
+    <View style={[s.heroContainer, { backgroundColor: colors.border }]}>
       <Image
         source={{
           uri: imageUrl || 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&q=80&w=800',

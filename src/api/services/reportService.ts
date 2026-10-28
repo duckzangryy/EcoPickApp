@@ -54,6 +54,15 @@ export interface ReportImage {
 	[key: string]: unknown;
 }
 
+export interface ReportComment {
+	id: string;
+	report_id: string;
+	user_id: string;
+	content: string;
+	created_at: string;
+	author: { id: string; fullname: string; avatar: string };
+}
+
 export interface AiWasteScanResult {
 	points: number;
 	color: string;
@@ -263,6 +272,23 @@ export const reportService = {
 		}
 	},
 
+	/** GET /api/v1/reports/{id}/comments – công khai */
+	getReportComments: async (id: string): Promise<ReportComment[]> => {
+		try {
+			const { data } = await api.get(ENDPOINTS.REPORTS.COMMENTS(id));
+			const payload = (data as any)?.data ?? data;
+			return Array.isArray(payload) ? payload : [];
+		} catch {
+			return [];
+		}
+	},
+
+	/** POST /api/v1/reports/{id}/comments */
+	addReportComment: async (id: string, content: string): Promise<ReportComment> => {
+		const { data } = await api.post(ENDPOINTS.REPORTS.COMMENTS(id), { content });
+		return ((data as any)?.data ?? data) as ReportComment;
+	},
+
 	/** GET /api/v1/reports/{id}/upvote – trạng thái upvote của tôi */
 	getUpvoteState: async (id: string): Promise<{ upvoted: boolean; upvoteCount: number }> => {
 		try {
@@ -282,6 +308,18 @@ export const reportService = {
 		});
 		const payload = (data as any)?.data ?? data;
 		return { upvoted: !!payload?.upvoted, upvoteCount: Number(payload?.upvoteCount ?? 0) };
+	},
+
+	/** POST /api/v1/reports/{id}/claim – nhận nhiệm vụ dọn dẹp (status → in_progress) */
+	claim: async (id: string): Promise<{ message?: string }> => {
+		const { data } = await api.post(ENDPOINTS.REPORTS.CLAIM(id));
+		return ((data as any)?.data ?? data) as { message?: string };
+	},
+
+	/** PATCH /api/v1/reports/{id}/status */
+	setStatus: async (id: string, status: string): Promise<Report> => {
+		const { data } = await api.patch(ENDPOINTS.REPORTS.STATUS(id), { status });
+		return ((data as any)?.data ?? data) as Report;
 	},
 
 	/** PATCH /api/report/reports/{id}/ */

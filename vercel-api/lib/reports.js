@@ -87,6 +87,10 @@ async function handleReports(req, res, path, method, database) {
   }
 
   if ((path === '/api/photos' || path === '/api/photos/') && method === 'DELETE') {
+    // Xóa TOÀN BỘ dữ liệu ảnh: chỉ staff (trước đây ai gọi cũng xóa được)
+    const auth = currentUser(req, res);
+    if (!auth) return;
+    if (!auth.is_staff) return fail(res, 403, 'FORBIDDEN', 'Chỉ quản trị viên mới được xóa toàn bộ dữ liệu');
     await database`DELETE FROM app_data WHERE collection='map_photos'`;
     await database`DELETE FROM reports`;
     return json(res, 200, { success: true, message: 'Đã xóa toàn bộ dữ liệu ảnh trên bản đồ' });
@@ -94,10 +98,49 @@ async function handleReports(req, res, path, method, database) {
 
   const photoDelete = path.match(/^\/api\/photos\/([^/]+)$/);
   if (photoDelete && method === 'DELETE') {
+    // Xóa 1 ảnh: chủ ảnh hoặc staff
+    const auth = currentUser(req, res);
+    if (!auth) return;
     const photoId = photoDelete[1];
+    const [photo] = await database`SELECT user_id FROM app_data WHERE collection='map_photos' AND id=${photoId}`;
+    if (photo && photo.user_id !== auth.userId && !auth.is_staff) {
+      return fail(res, 403, 'FORBIDDEN', 'Không có quyền xóa ảnh này');
+    }
     await database`DELETE FROM app_data WHERE collection='map_photos' AND id=${photoId}`;
     await database`DELETE FROM reports WHERE id=${photoId} OR id=${'rep-' + photoId}`;
     return json(res, 200, { success: true, message: 'Deleted photo' });
+  }
+
+  // ── Bình luận báo cáo: GET công khai, POST cần đăng nhập ──
+  const reportComments = path.match(/^\/api\/v1\/reports\/([^/]+)\/comments$/);
+  if (reportComments && method === 'GET') {
+    const [reportRow] = await database`SELECT id FROM reports WHERE id=${reportComments[1]} OR id=${'rep-' + reportComments[1]}`;
+    if (!reportRow) return fail(res, 404, 'NOT_FOUND', 'Không tìm thấy báo cáo');
+    const rows = await database`
+      SELECT c.id, c.report_id, c.user_id, c.content, c.created_at, u.fullname, u.avatar
+      FROM app_data c LEFT JOIN users u ON u.id = c.user_id
+      WHERE c.collection='report_comments' AND c.data->>'report_id'=${reportRow.id}
+      ORDER BY c.created_at ASC LIMIT 200`;
+    return json(res, 200, {
+      success: true,
+      data: rows.map((r) => ({ id: r.id, report_id: r.report_id, user_id: r.user_id, content: r.content, created_at: r.created_at, author: { id: r.user_id, fullname: r.fullname || 'Người dùng EcoPick', avatar: r.avatar || '' } })),
+    });
+  }
+  if (reportComments && method === 'POST') {
+    const auth = currentUser(req, res);
+    if (!auth) return;
+    const body = await bodyJson(req);
+    const content = String(body.content || body.text || body.comment || '').trim();
+    if (!content) return fail(res, 400, 'VALIDATION_ERROR', 'Nội dung bình luận bắt buộc');
+    if (content.length > 1000) return fail(res, 400, 'VALIDATION_ERROR', 'Bình luận tối đa 1000 ký tự');
+    const [reportRow] = await database`SELECT id FROM reports WHERE id=${reportComments[1]} OR id=${'rep-' + reportComments[1]}`;
+    if (!reportRow) return fail(res, 404, 'NOT_FOUND', 'Không tìm thấy báo cáo');
+    const id = `rc-${crypto.randomUUID()}`;
+    const [row] = await database`INSERT INTO app_data(collection,id,user_id,data)
+      VALUES('report_comments',${id},${auth.userId},${JSON.stringify({ id, report_id: reportRow.id, user_id: auth.userId, content, created_at: new Date().toISOString() })}::jsonb)
+      RETURNING data`;
+    const [u] = await database`SELECT fullname, avatar FROM users WHERE id=${auth.userId}`;
+    return json(res, 201, { success: true, data: { ...row.data, author: { id: auth.userId, fullname: u?.fullname || 'Người dùng EcoPick', avatar: u?.avatar || '' } } });
   }
 
   if (path === '/api/upload' && method === 'POST') {

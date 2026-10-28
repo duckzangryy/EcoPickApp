@@ -158,7 +158,7 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}>
         <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
-        <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]} >
+        <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <TouchableOpacity style={s.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
             <Ionicons name="arrow-back" size={16} color={colors.textPrimary} />
           </TouchableOpacity>
@@ -179,7 +179,7 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}>
         <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
-        <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]} >
+        <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <TouchableOpacity style={s.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
             <Ionicons name="arrow-back" size={16} color={colors.textPrimary} />
           </TouchableOpacity>
@@ -215,7 +215,7 @@ export default function EventDetailScreen() {
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]} >
+      <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={s.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={16} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -247,6 +247,7 @@ export default function EventDetailScreen() {
           <TouchableOpacity
             style={[
               s.mainJoinButton,
+              { backgroundColor: colors.primary },
               joined && { backgroundColor: colors.borderMedium },
               isEventEnded && s.disabledButton,
             ]}

@@ -16,6 +16,8 @@
     { "source": "/api/v1/reports/:id/upvote", "destination": "/api?route=/api/v1/reports/:id/upvote" },
     { "source": "/api/v1/reports/:id/claim", "destination": "/api?route=/api/v1/reports/:id/claim" },
     { "source": "/api/v1/reports/:id/status", "destination": "/api?route=/api/v1/reports/:id/status" },
+    { "source": "/api/v1/reports/:id/comments", "destination": "/api?route=/api/v1/reports/:id/comments" },
+    { "source": "/api/v1/users/me/streak", "destination": "/api?route=/api/v1/users/me/streak" },
     { "source": "/api/:path*/", "destination": "/api?route=/api/:path*/" },
     { "source": "/api/:path*", "destination": "/api?route=/api/:path*" },
     { "source": "/health/", "destination": "/api?route=/health" },

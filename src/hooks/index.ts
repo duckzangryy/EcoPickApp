@@ -11,6 +11,9 @@ export {
   useUsers,
   useUpdateUser,
   useDeleteUser,
+  useLeaderboard,
+  useMyStreak,
+  useToggleFollow,
 } from './useUserQueries';
 
 // Events
@@ -47,6 +50,9 @@ export {
   useReportImages,
   useReportUpvoteState,
   useToggleReportUpvote,
+  useReportComments,
+  useAddReportComment,
+  useClaimReport,
   useCreateReport,
   useUpdateReport,
   useDeleteReport,

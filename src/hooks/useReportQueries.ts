@@ -1,5 +1,5 @@
 import { queryKeys } from "@/api/queryKeys";
-import { reportImageService, reportService, type CreateReportPayload, type Report, type AiWasteScanResult } from "@/api/services/reportService";
+import { reportImageService, reportService, type CreateReportPayload, type Report, type ReportComment, type AiWasteScanResult } from "@/api/services/reportService";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ============================================================
@@ -48,6 +48,40 @@ export const useCreateReport = () => {
 			const errorMsg =
 				error?.response?.data?.detail || error?.response?.data?.error || error?.message || "Failed to create report";
 			console.error(errorMsg);
+		},
+	});
+};
+
+/** POST /api/v1/reports/{id}/claim – nhận nhiệm vụ dọn dẹp */
+export const useClaimReport = () => {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (id: string) => reportService.claim(id),
+		onSuccess: (_data, id) => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.reports.details() });
+			queryClient.invalidateQueries({ queryKey: queryKeys.reports.lists() });
+		},
+	});
+};
+
+/** GET /api/v1/reports/{id}/comments – bình luận thật của báo cáo */
+export const useReportComments = (id?: string) => {
+	return useQuery({
+		queryKey: [...queryKeys.reports.detail(id || ""), "comments"],
+		queryFn: () => reportService.getReportComments(id as string),
+		enabled: !!id,
+	});
+};
+
+/** POST /api/v1/reports/{id}/comments */
+export const useAddReportComment = () => {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ id, content }: { id: string; content: string }) => reportService.addReportComment(id, content),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: [...queryKeys.reports.detail(variables.id), "comments"] });
 		},
 	});
 };

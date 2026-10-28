@@ -7,7 +7,6 @@ import { Fonts } from '../../../../constants';
 import { getColors } from '@/constants/Colors';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
-import { CHAT_AVATAR } from '../constants';
 
 interface ChatMessage {
   id: string;
@@ -22,22 +21,8 @@ export default function EventChat() {
   const colors = getColors(useThemeStore((state) => state.theme));
   const user = useAuthStore((state) => state.user);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      author: 'Mark T.',
-      time: '08:15',
-      text: 'Mình mang theo 3 bao tải dứa và găng tay cao su dự phòng cho nhóm nhé!',
-      isMe: false,
-    },
-    {
-      id: '2',
-      author: user?.fullname || 'Bạn',
-      time: '08:20',
-      text: 'Tuyệt vời, cảm ơn bạn rất nhiều! Hẹn gặp cả đội tại điểm tập kết đúng giờ.',
-      isMe: true,
-    },
-  ]);
+  // ponytail: chat chỉ lưu local, chưa có API event_messages — wire backend khi cần đồng bộ nhóm
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
 
   const handleSend = () => {
@@ -89,7 +74,7 @@ export default function EventChat() {
             </View>
           ) : (
             <View key={msg.id} style={s.chatRowLeft}>
-              <Image source={{ uri: CHAT_AVATAR }} style={s.chatAvatar} />
+              <View style={[s.chatAvatar, { backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }]}><Text style={{ fontFamily: Fonts.bold, fontSize: 12, color: colors.primary }}>{msg.author.charAt(0).toUpperCase()}</Text></View>
               <View style={[s.chatBubbleLeft, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
                 <View style={s.chatBubbleHeader}>
                   <Text style={[s.chatAuthor, { color: colors.textPrimary }]}>{msg.author}</Text>

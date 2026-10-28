@@ -1,5 +1,5 @@
 import { useBadges, useExchangeItems, useRedeemExchangeItem, useUserBadges } from '@/hooks/useBadgeQueries';
-import { useUserInfo } from '@/hooks/useUserQueries';
+import { useLeaderboard, useMyStreak, useUserInfo } from '@/hooks/useUserQueries';
 import { useAuthStore } from '@/stores/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -213,6 +213,16 @@ export default function BadgesScreen() {
 
   const isLoading = loadingBadges || loadingUserBadges;
 
+  // ── Leaderboard + streak ──
+  const [period, setPeriod] = React.useState<'weekly' | 'monthly' | 'all'>('weekly');
+  const { data: leaderboard = [], isLoading: loadingBoard } = useLeaderboard(period);
+  const { data: streak } = useMyStreak();
+  const PERIODS: Array<{ key: 'weekly' | 'monthly' | 'all'; label: string }> = [
+    { key: 'weekly', label: 'Tuần' },
+    { key: 'monthly', label: 'Tháng' },
+    { key: 'all', label: 'Tổng' },
+  ];
+
   // Helper: get category label via i18n
   const getCategoryLabel = (category?: string): string => {
     const key = category && Object.keys(CATEGORY_COLOR).includes(category) ? category : 'default';
@@ -332,6 +342,76 @@ export default function BadgesScreen() {
               </Text>
             </View>
           </View>
+        </View>
+
+        {/* ─── Streak + Leaderboard ─── */}
+        <View style={[styles.progressBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="flame" size={18} color="#F97316" />
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Chuỗi hoạt động</Text>
+          </View>
+          <View style={styles.streakRow}>
+            <View style={[styles.streakStat, { backgroundColor: colors.primaryLight }]}>
+              <Text style={[styles.streakStatValue, { color: colors.primary }]}>{streak?.streak ?? 0}</Text>
+              <Text style={[styles.streakStatLabel, { color: colors.textSecondary }]}>ngày liên tiếp</Text>
+            </View>
+            <View style={[styles.streakStat, { backgroundColor: colors.primaryLight }]}>
+              <Text style={[styles.streakStatValue, { color: colors.primary }]}>{streak?.activeDays ?? 0}</Text>
+              <Text style={[styles.streakStatLabel, { color: colors.textSecondary }]}>ngày tích điểm</Text>
+            </View>
+            <View style={[styles.streakStat, { backgroundColor: colors.primaryLight }]}>
+              <Text style={[styles.streakStatValue, { color: colors.primary }]}>{user?.eco_points || 0}</Text>
+              <Text style={[styles.streakStatLabel, { color: colors.textSecondary }]}>điểm Eco</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="podium" size={17} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Bảng xếp hạng</Text>
+          </View>
+          <View style={styles.periodTabs}>
+            {PERIODS.map((p) => (
+              <TouchableOpacity
+                key={p.key}
+                style={[styles.periodTab, { borderColor: colors.border }, period === p.key && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                onPress={() => setPeriod(p.key)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.periodTabText, { color: colors.textSecondary }, period === p.key && { color: '#FFFFFF' }]}>{p.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {loadingBoard ? (
+            <Text style={[styles.rewardDesc, { color: colors.textSecondary }]}>Đang tải bảng xếp hạng…</Text>
+          ) : leaderboard.length === 0 ? (
+            <Text style={[styles.rewardDesc, { color: colors.textSecondary }]}>Chưa có dữ liệu xếp hạng cho kỳ này.</Text>
+          ) : (
+            leaderboard.slice(0, 10).map((entry, i) => {
+              const medal = ['🥇', '🥈', '🥉'][i];
+              const isMe = entry.id === userId;
+              return (
+                <View key={entry.id} style={[styles.leaderRow, { backgroundColor: colors.card, borderColor: colors.border }, isMe && { borderColor: colors.primary, borderWidth: 2 }]}>
+                  <Text style={styles.leaderRank}>{medal || `${entry.rank}`}</Text>
+                  {entry.avatarUrl ? (
+                    <Image source={{ uri: entry.avatarUrl }} style={styles.leaderAvatar} />
+                  ) : (
+                    <View style={[styles.leaderAvatar, { backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={{ fontFamily: Fonts.bold, fontSize: 14, color: colors.primary }}>{(entry.fullName || '?').charAt(0).toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <View style={styles.leaderInfo}>
+                    <Text style={[styles.leaderName, { color: colors.textPrimary }]} numberOfLines={1}>
+                      {entry.fullName || 'Người dùng EcoPick'}{isMe ? ' (Bạn)' : ''}
+                    </Text>
+                    <Text style={[styles.leaderPoints, { color: colors.textSecondary }]}>Cấp {entry.level ?? 1} · {entry.reportsCount ?? 0} báo cáo</Text>
+                  </View>
+                  <Text style={[styles.leaderScore, { color: colors.primary }]}>{entry.ecoPoints}</Text>
+                </View>
+              );
+            })
+          )}
         </View>
 
         <View style={styles.sectionBlock}>
@@ -627,6 +707,20 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   balanceText: { fontFamily: Fonts.bold, fontSize: 14, color: Colors.primary },
+  streakRow: { flexDirection: 'row', gap: 10 },
+  streakStat: { flex: 1, borderRadius: 14, paddingVertical: 12, alignItems: 'center', gap: 2 },
+  streakStatValue: { fontFamily: Fonts.bold, fontSize: 20 },
+  streakStatLabel: { fontFamily: Fonts.regular, fontSize: 11 },
+  periodTabs: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  periodTab: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: BorderRadius.full, borderWidth: 1 },
+  periodTabText: { fontFamily: Fonts.semiBold, fontSize: 13 },
+  leaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, padding: 10 },
+  leaderRank: { width: 26, textAlign: 'center', fontFamily: Fonts.bold, fontSize: 14, color: '#565e69' },
+  leaderAvatar: { width: 36, height: 36, borderRadius: 18 },
+  leaderInfo: { flex: 1, gap: 1 },
+  leaderName: { fontFamily: Fonts.semiBold, fontSize: 14 },
+  leaderPoints: { fontFamily: Fonts.regular, fontSize: 11 },
+  leaderScore: { fontFamily: Fonts.bold, fontSize: 15 },
   successOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   successCard: { width: '100%', maxWidth: 380, backgroundColor: Colors.white, borderRadius: 24, padding: 24, alignItems: 'center', gap: 10 },
   successIcon: { width: 58, height: 58, borderRadius: 29, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },

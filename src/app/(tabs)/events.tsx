@@ -22,16 +22,10 @@ import { Colors, Fonts } from '../../constants';
 import { getColors } from '@/constants/Colors';
 import { useThemeStore } from '@/stores/themeStore';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
-import { useEvents, useEventParticipantsByUser } from '../../hooks/useEventQueries';
+import { useEvents, useEventParticipants, useEventParticipantsByUser } from '../../hooks/useEventQueries';
 import { useAuthStore } from '../../stores/authStore';
 
 const TAB_KEYS = ['upcoming', 'myEvents', 'past'] as const;
-
-const AVATAR_IMAGES = [
-  'https://i.pravatar.cc/100?u=a1',
-  'https://i.pravatar.cc/100?u=b2',
-  'https://i.pravatar.cc/100?u=c3',
-];
 
 /** Format API date string to display format */
 function formatEventDate(dateStr: string): string {
@@ -141,6 +135,23 @@ export default function EventsScreen() {
   // ── Fetch events from API ──
   const { data: apiEvents = [], isLoading, isRefetching, isError, refetch } = useEvents();
   const { data: myParticipants = [] } = useEventParticipantsByUser(user?.id);
+  // Avatar thật cho mọi thẻ: 1 query participants toàn cục, map theo event
+  const { data: allParticipants = [] } = useEventParticipants();
+  const avatarsByEvent = useMemo(() => {
+    const map = new Map<string, { id: string; fullname: string; avatar: string }[]>();
+    allParticipants.forEach((p: any) => {
+      const eid = p.event || p.event_id;
+      const uid = p.user || p.user_id || p.participant?.id;
+      if (!eid || !uid) return;
+      if (p.status && p.status !== 'joined' && p.status !== 'checked_in') return;
+      const list = map.get(eid) || [];
+      if (!list.some((x) => x.id === uid)) {
+        list.push({ id: uid, fullname: p.participant?.fullname || '', avatar: p.participant?.avatar || '' });
+      }
+      map.set(eid, list);
+    });
+    return map;
+  }, [allParticipants]);
   const joinedEventIds = useMemo(
     () => new Set(myParticipants.map((p) => p.event).filter(Boolean)),
     [myParticipants],
@@ -228,13 +239,22 @@ export default function EventsScreen() {
                       </>
                     );
                   }
-                  const visibleAvatars = AVATAR_IMAGES.slice(0, Math.min(count, 3));
+                  const eventParticipants = avatarsByEvent.get(item.id) || [];
+                  const visibleAvatars = eventParticipants.slice(0, Math.min(count, 3));
                   return (
                     <>
                       <View style={styles.avatarsStack}>
-                        {visibleAvatars.map((uri, idx) => (
-                          <View key={idx} style={[styles.avatar, { zIndex: 3 - idx, marginLeft: idx > 0 ? -6 : 0 }]}>
-                            <Image source={{ uri }} style={styles.avatarImage} />
+                        {visibleAvatars.map((p, idx) => (
+                          <View key={p.id} style={[styles.avatar, { zIndex: 3 - idx, marginLeft: idx > 0 ? -6 : 0 }]}>
+                            {p.avatar ? (
+                              <Image source={{ uri: p.avatar }} style={styles.avatarImage} />
+                            ) : (
+                              <View style={[styles.avatarImage, { backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }]}>
+                                <Text style={{ fontSize: 10, fontFamily: Fonts.bold, color: colors.primary }}>
+                                  {(p.fullname || '?').charAt(0).toUpperCase()}
+                                </Text>
+                              </View>
+                            )}
                           </View>
                         ))}
                       </View>
@@ -277,7 +297,7 @@ export default function EventsScreen() {
       </TouchableOpacity>
       </Reanimated.View>
     ),
-    [handleJoinEvent, handlePressCard, user?.id, t, colors.card, colors.border],
+    [handleJoinEvent, handlePressCard, user?.id, t, colors.card, colors.border, colors.primaryLight, colors.primary, avatarsByEvent],
   );
   const {bottomTabHeight} = useLayout();
 

@@ -134,6 +134,38 @@ export const useUsers = (filters?: Record<string, unknown>) => {
 	});
 };
 
+/** GET /api/v1/leaderboard?period=weekly|monthly|all */
+export const useLeaderboard = (period: 'weekly' | 'monthly' | 'all' = 'all') => {
+	return useQuery({
+		queryKey: ['leaderboard', period],
+		queryFn: () => userService.getLeaderboard(period),
+		staleTime: 60 * 1000,
+	});
+};
+
+/** GET /api/v1/users/me/streak – chuỗi ngày hoạt động liên tục */
+export const useMyStreak = () => {
+	const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+	return useQuery({
+		queryKey: ['users', 'streak', 'me'],
+		queryFn: () => userService.getStreak(),
+		enabled: isAuthenticated,
+	});
+};
+
+/** POST/DELETE /api/v1/users/{id}/follow */
+export const useToggleFollow = () => {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ id, follow }: { id: string; follow: boolean }) => userService.setFollowing(id, follow),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
+		},
+	});
+};
+
 // ============================================================
 // User Mutations
 // ============================================================

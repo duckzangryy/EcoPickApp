@@ -1,4 +1,4 @@
-import { useEvent, useEventParticipantsByEvent } from '@/hooks/useEventQueries';
+import { useEventParticipantsByEvent } from '@/hooks/useEventQueries';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo } from 'react';
@@ -25,11 +25,7 @@ interface Participant {
   email: string;
 }
 
-const DEFAULT_AVATARS = [
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400',
-  'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=400',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-];
+const FALLBACK_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400';
 
 const ParticipantsScreen = () => {
   const { t } = useTranslation();
@@ -37,7 +33,6 @@ const ParticipantsScreen = () => {
   const theme = useThemeStore((state) => state.theme);
   const colors = getColors(theme);
   const insets = useSafeAreaInsets();
-  const { data: event } = useEvent(id as string);
   const { data: participants, isLoading, isRefetching, refetch } = useEventParticipantsByEvent(id as string);
 
   const participantList = useMemo(() => {
@@ -60,21 +55,8 @@ const ParticipantsScreen = () => {
         };
       }) as Participant[];
 
-    if (list.length > 0) return list;
-
-    // Fallback: nếu API participants chưa trả về nhưng sự kiện có số người tham gia định sẵn
-    const targetCount = Number(event?.current_paticipants ?? (event as any)?.current_participants ?? 0);
-    if (targetCount > 0) {
-      return Array.from({ length: targetCount }, (_, i) => ({
-        id: `demo-participant-${i + 1}`,
-        fullname: i === 0 ? 'Phạm Bá Anh Tuấn' : i === 1 ? 'Vũ Nhật Trường' : `Tình nguyện viên #${i + 1}`,
-        email: i === 0 ? 'tuan@eco.vn' : i === 1 ? 'truong@eco.vn' : `volunteer${i + 1}@ecopick.vn`,
-        avatar: DEFAULT_AVATARS[i % DEFAULT_AVATARS.length],
-      }));
-    }
-
-    return [];
-  }, [participants, event, id]);
+    return list;
+  }, [participants, id]);
 
   const renderItem = ({ item: participant }: { item: Participant }) => (
     <View style={[styles.participantCard, { backgroundColor: colors.card, borderColor: colors.border }]}>

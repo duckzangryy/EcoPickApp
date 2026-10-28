@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { BorderRadius, Colors, Fonts, FontSizes, Spacing } from '../../../../constants';
+import { BorderRadius, Colors, Fonts, FontSizes, Spacing, getColors } from '../../../../constants';
+import { useThemeStore } from '../../../../stores/themeStore';
 import { useToggleReportUpvote, useReportUpvoteState } from '../../../../hooks/useReportQueries';
 import { useAuthStore } from '../../../../stores/authStore';
 
@@ -17,6 +18,8 @@ interface LocationTitleProps {
 
 const LocationUpvote = ({ reportId }: { reportId: string }) => {
   const { t } = useTranslation();
+  const themeMode = useThemeStore((s) => s.theme);
+  const colors = getColors(themeMode);
   const token = useAuthStore((s) => s.token);
   const { data: state } = useReportUpvoteState(reportId);
   const toggle = useToggleReportUpvote();
@@ -30,13 +33,13 @@ const LocationUpvote = ({ reportId }: { reportId: string }) => {
   const upvoted = !!state?.upvoted;
   return (
     <TouchableOpacity
-      style={[s.upvoteBtn, upvoted && { backgroundColor: Colors.primaryLight, borderColor: Colors.primary }]}
+      style={[s.upvoteBtn, { backgroundColor: colors.white, borderColor: colors.border }, upvoted && { backgroundColor: colors.primaryLight, borderColor: colors.primary }]}
       onPress={onPress}
       activeOpacity={0.8}
       disabled={!token}
     >
-      <Ionicons name={upvoted ? 'thumbs-up' : 'thumbs-up-outline'} size={14} color={upvoted ? Colors.primary : Colors.textSecondary} />
-      <Text style={[s.upvoteText, upvoted && { color: Colors.primary, fontFamily: Fonts.semiBold }]}>
+      <Ionicons name={upvoted ? 'thumbs-up' : 'thumbs-up-outline'} size={14} color={upvoted ? colors.primary : colors.textSecondary} />
+      <Text style={[s.upvoteText, upvoted && { color: colors.primary, fontFamily: Fonts.semiBold }]}>
         {state?.upvoteCount ?? 0}
       </Text>
     </TouchableOpacity>
@@ -45,11 +48,13 @@ const LocationUpvote = ({ reportId }: { reportId: string }) => {
 
 const LocationTitle = ({ reportId, reportTitle, severityLabel, severityTheme, distanceText }: LocationTitleProps) => {
   const { t } = useTranslation();
+  const themeMode = useThemeStore((s) => s.theme);
+  const colors = getColors(themeMode);
 
   return (
     <View style={s.titleSection}>
       <View style={s.titleRow}>
-        <Text style={s.title}>{reportTitle}</Text>
+        <Text style={[s.title, { color: colors.textPrimary }]}>{reportTitle}</Text>
         <View
           style={[
             s.severityBadge,
@@ -65,12 +70,12 @@ const LocationTitle = ({ reportId, reportTitle, severityLabel, severityTheme, di
 
       <View style={s.metaRow}>
         <View style={s.metaItem}>
-          <Ionicons name="navigate-outline" size={16} color={Colors.textSecondary} />
-          <Text style={s.metaText}>{distanceText}</Text>
+          <Ionicons name="navigate-outline" size={16} color={colors.textSecondary} />
+          <Text style={[s.metaText, { color: colors.textSecondary }]}>{distanceText}</Text>
         </View>
         <View style={s.metaItem}>
-          <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
-          <Text style={s.metaText}>{t('location.reportedAgo')}</Text>
+          <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
+          <Text style={[s.metaText, { color: colors.textSecondary }]}>{t('location.reportedAgo')}</Text>
         </View>
         <LocationUpvote reportId={reportId} />
       </View>
@@ -82,7 +87,7 @@ export default LocationTitle;
 const s = StyleSheet.create({
   titleSection: { paddingHorizontal: Spacing.base, marginBottom: Spacing.lg },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 },
-  title: { flex: 1, fontFamily: Fonts.bold, fontSize: 24, lineHeight: 30, color: Colors.textPrimary },
+  title: { flex: 1, fontFamily: Fonts.bold, fontSize: 24, lineHeight: 30 },
   severityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -95,7 +100,7 @@ const s = StyleSheet.create({
   severityText: { fontFamily: Fonts.bold, fontSize: 10, letterSpacing: 0.5 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { fontFamily: Fonts.regular, fontSize: FontSizes.sm, color: Colors.textSecondary },
+  metaText: { fontFamily: Fonts.regular, fontSize: FontSizes.sm },
   upvoteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -107,5 +112,5 @@ const s = StyleSheet.create({
     borderColor: Colors.border,
     backgroundColor: Colors.white,
   },
-  upvoteText: { fontFamily: Fonts.medium, fontSize: FontSizes.sm, color: Colors.textSecondary },
+  upvoteText: { fontFamily: Fonts.medium, fontSize: FontSizes.sm },
 });

@@ -15,10 +15,11 @@ import {
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
-import { Colors, Fonts, FontSizes, Spacing } from '../../../constants';
+import { Colors, Fonts, FontSizes, Spacing, getColors } from '../../../constants';
 import { SeverityLevel } from '../../../data/mockData';
 import { useReport } from '../../../hooks/useReportQueries';
 import { useAuthStore } from '../../../stores';
+import { useThemeStore } from '../../../stores/themeStore';
 import { formatDistanceInfo } from '../../../utils/distance';
 import { getSeverityTheme } from '../../../utils/severity';
 import { shareContent } from '../../../utils/share';
@@ -42,6 +43,8 @@ export default function LocationDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { t } = useTranslation();
+  const themeMode = useThemeStore((s) => s.theme);
+  const colors = getColors(themeMode);
 
   const { data: report, isLoading, isError } = useReport(id as string);
   const { user } = useAuthStore();
@@ -134,17 +137,17 @@ export default function LocationDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('location.detailsTitle')}</Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('location.detailsTitle')}</Text>
           <View style={styles.headerBtn} />
         </View>
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loaderText}>{t('common.loading') || 'Loading...'}</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loaderText, { color: colors.textSecondary }]}>{t('common.loading') || 'Loading...'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -152,8 +155,8 @@ export default function LocationDetailScreen() {
 
   if (isError || !report) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{t('location.reportNotFound')}</Text>
+      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.textSecondary }]}>{t('location.reportNotFound')}</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backBtnText}>{t('common.goBack')}</Text>
         </TouchableOpacity>
@@ -162,14 +165,14 @@ export default function LocationDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('location.detailsTitle')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('location.detailsTitle')}</Text>
         <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7} onPress={handleShare}>
-          <Ionicons name="share-social-outline" size={24} color={Colors.textPrimary} />
+          <Ionicons name="share-social-outline" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -188,6 +191,8 @@ export default function LocationDetailScreen() {
           />
 
           <LocationActions
+            reportId={report.id as string}
+            status={report.status as string}
             role={user?.role?.name?.toLowerCase()}
             onNavigate={handleNavigate}
             onCreateEvent={handleCreateEvent}
@@ -199,7 +204,7 @@ export default function LocationDetailScreen() {
 
           <LocationDescription description={report.description} />
 
-          <LocationComments />
+          <LocationComments reportId={report.id as string} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -207,7 +212,7 @@ export default function LocationDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.white },
+  safeArea: { flex: 1, backgroundColor: '#F6F8F7' },
   errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   errorText: { fontFamily: Fonts.medium, fontSize: 18, color: Colors.textSecondary, marginBottom: 16 },
   backBtn: { padding: 12, backgroundColor: Colors.primary, borderRadius: 8 },

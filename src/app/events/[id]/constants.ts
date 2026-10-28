@@ -6,7 +6,6 @@ export const PARTICIPANT_AVATARS = [
   'https://i.pravatar.cc/100?u=p4',
 ];
 
-export const CHAT_AVATAR = 'https://i.pravatar.cc/100?u=sarah';
 
 /** Parse "DD/MM/YYYY HH:mm:ss" hoặc ISO; dùng giờ tường của sự kiện, không đổi theo thiết bị. */
 export const parseEventDate = (value?: string | null): Date | null => {
@@ -69,6 +68,5 @@ export const parseEquipment = (
 };
 export default {
   PARTICIPANT_AVATARS,
-  CHAT_AVATAR,
   formatDate,
 }

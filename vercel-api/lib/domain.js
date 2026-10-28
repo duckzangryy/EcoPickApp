@@ -83,8 +83,49 @@ async function handleDomain(req, res, path, method, database, url) {
   }
 
   if (normalized === '/api/v1/leaderboard' && method === 'GET') {
-    const rows = await database`SELECT id,fullname,avatar,eco_points,level,total_reports FROM users ORDER BY eco_points DESC LIMIT 100`;
-    return json(res, 200, { success: true, data: { leaderboard: rows.map((row, index) => ({ rank: index + 1, id: row.id, fullName: row.fullname, avatarUrl: row.avatar, ecoPoints: row.eco_points, level: row.level, reportsCount: row.total_reports })) } });
+    // period=weekly|monthly|all — cộng điểm từ point_logs theo kỳ (mặc định all = eco_points tổng)
+    const period = (url.searchParams.get('period') || 'all').toLowerCase();
+    if (period === 'weekly' || period === 'monthly') {
+      const days = period === 'weekly' ? 7 : 30;
+      const rows = await database`
+        SELECT u.id, u.fullname, u.avatar, u.level,
+          COALESCE(SUM(pl.points),0)::int AS eco_points,
+          count(*) FILTER (WHERE pl.action='report_submitted')::int AS total_reports
+        FROM point_logs pl JOIN users u ON u.id=pl.user_id AND u.is_active=true
+        WHERE pl.created_at >= now() - (${days} || ' days')::interval AND pl.points > 0
+        GROUP BY u.id, u.fullname, u.avatar, u.level
+        ORDER BY eco_points DESC LIMIT 100`;
+      return json(res, 200, { success: true, data: { leaderboard: rows.map((row, index) => ({ rank: index + 1, id: row.id, fullName: row.fullname, avatarUrl: typeof row.avatar === 'string' && /blob:|^\{\\?"uri/.test(row.avatar) ? '' : row.avatar, ecoPoints: row.eco_points, level: row.level, reportsCount: row.total_reports })) } });
+    }
+    const rows = await database`SELECT id,fullname,avatar,eco_points,level,total_reports FROM users WHERE is_active=true ORDER BY eco_points DESC LIMIT 100`;
+    return json(res, 200, { success: true, data: { leaderboard: rows.map((row, index) => ({ rank: index + 1, id: row.id, fullName: row.fullname, avatarUrl: typeof row.avatar === 'string' && /blob:|^\{\\?"uri/.test(row.avatar) ? '' : row.avatar, ecoPoints: row.eco_points, level: row.level, reportsCount: row.total_reports })) } });
+  }
+
+  // Chuỗi ngày hoạt động liên tục (streak) của tôi — dựa trên point_logs
+  if (normalized === '/api/v1/users/me/streak' && method === 'GET') {
+    const auth = currentUser(req, res);
+    if (!auth) return true;
+    const rows = await database`
+      SELECT DISTINCT (created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS d
+      FROM point_logs WHERE user_id=${auth.userId} AND points > 0
+      ORDER BY d DESC LIMIT 120`;
+    // Neon driver trả Date (UTC nửa đêm +07) cho ::date — chuẩn hóa về yyyy-mm-dd
+    const days = rows.map((r) => (r.d instanceof Date ? r.d.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) : String(r.d).slice(0, 10)));
+    let streak = 0;
+    if (days.length > 0) {
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+      const cursor = new Date(days[0] + 'T00:00:00+07:00');
+      const todayMs = new Date(today + 'T00:00:00+07:00').getTime();
+      // Chuỗi chỉ tính khi có hoạt động hôm nay hoặc hôm qua
+      if (todayMs - cursor.getTime() <= 86400000) {
+        streak = 1;
+        for (let i = 1; i < days.length; i++) {
+          const gap = cursor.getTime() - new Date(days[i] + 'T00:00:00+07:00').getTime();
+          if (gap === 86400000) { streak++; cursor.setDate(cursor.getDate() - 1); } else break;
+        }
+      }
+    }
+    return json(res, 200, { success: true, data: { streak, activeDays: days.length, lastActive: days[0] || null } });
   }
 
   if (normalized === '/api/v1/challenges/daily' && method === 'GET') {
