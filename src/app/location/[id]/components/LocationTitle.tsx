@@ -2,17 +2,48 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
-import { Colors, Fonts, FontSizes, Spacing } from '../../../../constants';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { BorderRadius, Colors, Fonts, FontSizes, Spacing } from '../../../../constants';
+import { useToggleReportUpvote, useReportUpvoteState } from '../../../../hooks/useReportQueries';
+import { useAuthStore } from '../../../../stores/authStore';
 
 interface LocationTitleProps {
+  reportId: string;
   reportTitle: string;
   severityLabel: string;
   severityTheme: { backgroundColor: string; borderColor: string; textColor: string };
   distanceText: string;
 }
 
-const LocationTitle = ({ reportTitle, severityLabel, severityTheme, distanceText }: LocationTitleProps) => {
+const LocationUpvote = ({ reportId }: { reportId: string }) => {
+  const { t } = useTranslation();
+  const token = useAuthStore((s) => s.token);
+  const { data: state } = useReportUpvoteState(reportId);
+  const toggle = useToggleReportUpvote();
+
+  // Chưa đăng nhập: hiển thị số nhưng bấm không làm gì (server sẽ 401)
+  const onPress = () => {
+    if (!token || toggle.isPending) return;
+    toggle.mutate({ id: reportId, upvote: !state?.upvoted });
+  };
+
+  const upvoted = !!state?.upvoted;
+  return (
+    <TouchableOpacity
+      style={[s.upvoteBtn, upvoted && { backgroundColor: Colors.primaryLight, borderColor: Colors.primary }]}
+      onPress={onPress}
+      activeOpacity={0.8}
+      disabled={!token}
+    >
+      <Ionicons name={upvoted ? 'thumbs-up' : 'thumbs-up-outline'} size={14} color={upvoted ? Colors.primary : Colors.textSecondary} />
+      <Text style={[s.upvoteText, upvoted && { color: Colors.primary, fontFamily: Fonts.semiBold }]}>
+        {state?.upvoteCount ?? 0}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+const LocationTitle = ({ reportId, reportTitle, severityLabel, severityTheme, distanceText }: LocationTitleProps) => {
   const { t } = useTranslation();
 
   return (
@@ -41,6 +72,7 @@ const LocationTitle = ({ reportTitle, severityLabel, severityTheme, distanceText
           <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
           <Text style={s.metaText}>{t('location.reportedAgo')}</Text>
         </View>
+        <LocationUpvote reportId={reportId} />
       </View>
     </View>
   );
@@ -61,7 +93,19 @@ const s = StyleSheet.create({
     borderWidth: 1,
   },
   severityText: { fontFamily: Fonts.bold, fontSize: 10, letterSpacing: 0.5 },
-  metaRow: { flexDirection: 'row', gap: 16 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { fontFamily: Fonts.regular, fontSize: FontSizes.sm, color: Colors.textSecondary },
+  upvoteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  upvoteText: { fontFamily: Fonts.medium, fontSize: FontSizes.sm, color: Colors.textSecondary },
 });

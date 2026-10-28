@@ -180,6 +180,7 @@ export default function LocationDetailScreen() {
           />
 
           <LocationTitle
+            reportId={report.id as string}
             reportTitle={reportTitle as string}
             severityLabel={severityLabel}
             severityTheme={severityTheme}

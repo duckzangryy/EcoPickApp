@@ -263,6 +263,27 @@ export const reportService = {
 		}
 	},
 
+	/** GET /api/v1/reports/{id}/upvote – trạng thái upvote của tôi */
+	getUpvoteState: async (id: string): Promise<{ upvoted: boolean; upvoteCount: number }> => {
+		try {
+			const { data } = await api.get(ENDPOINTS.REPORTS.UPVOTE(id));
+			const payload = (data as any)?.data ?? data;
+			return { upvoted: !!payload?.upvoted, upvoteCount: Number(payload?.upvoteCount ?? 0) };
+		} catch {
+			return { upvoted: false, upvoteCount: 0 };
+		}
+	},
+
+	/** POST/DELETE /api/v1/reports/{id}/upvote – server trả state chuẩn (idempotent) */
+	toggleUpvote: async (id: string, upvote: boolean): Promise<{ upvoted: boolean; upvoteCount: number }> => {
+		const { data } = await api.request({
+			url: ENDPOINTS.REPORTS.UPVOTE(id),
+			method: upvote ? "POST" : "DELETE",
+		});
+		const payload = (data as any)?.data ?? data;
+		return { upvoted: !!payload?.upvoted, upvoteCount: Number(payload?.upvoteCount ?? 0) };
+	},
+
 	/** PATCH /api/report/reports/{id}/ */
 	update: async (id: string, payload: Partial<Report>) => {
 		return { id, ...payload } as any;

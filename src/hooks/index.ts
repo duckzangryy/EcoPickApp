@@ -45,6 +45,8 @@ export {
   useReports,
   useReport,
   useReportImages,
+  useReportUpvoteState,
+  useToggleReportUpvote,
   useCreateReport,
   useUpdateReport,
   useDeleteReport,

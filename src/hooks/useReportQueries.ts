@@ -52,6 +52,28 @@ export const useCreateReport = () => {
 	});
 };
 
+/** GET /api/v1/reports/{id}/upvote – tôi đã upvote chưa */
+export const useReportUpvoteState = (id?: string) => {
+	return useQuery({
+		queryKey: [...queryKeys.reports.detail(id || ""), "upvote"],
+		queryFn: () => reportService.getUpvoteState(id as string),
+		enabled: !!id,
+	});
+};
+
+/** POST/DELETE /api/v1/reports/{id}/upvote – server trả state chuẩn, client chỉ render theo */
+export const useToggleReportUpvote = () => {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ id, upvote }: { id: string; upvote: boolean }) => reportService.toggleUpvote(id, upvote),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: [...queryKeys.reports.detail(variables.id), "upvote"] });
+			queryClient.invalidateQueries({ queryKey: queryKeys.reports.lists() });
+		},
+	});
+};
+
 /** PATCH /api/report/reports/{id}/ */
 export const useUpdateReport = () => {
 	const queryClient = useQueryClient();
