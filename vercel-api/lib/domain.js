@@ -9,6 +9,7 @@ const {
   uploadImage,
   joinEvent,
 } = require('./helpers');
+const { analyzeWasteImage } = require('./gemini');
 
 const collections = {
   '/api/post/posts': 'posts',
@@ -38,6 +39,15 @@ const collections = {
 
 async function handleDomain(req, res, path, method, database, url) {
   const normalized = path.replace(/\/$/, '');
+  if (normalized === '/api/ai/scan' && method === 'POST') {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('multipart/form-data')) return fail(res, 400, 'VALIDATION_ERROR', 'Cần gửi ảnh dạng multipart/form-data (trường image)');
+    const { uploaded } = await parseMultipart(req);
+    if (!uploaded || !uploaded.buffer?.length) return fail(res, 400, 'VALIDATION_ERROR', 'Không tìm thấy ảnh (trường image)');
+    const analysis = await analyzeWasteImage(uploaded.buffer, uploaded.mimeType);
+    if (!analysis) return fail(res, 502, 'AI_UNAVAILABLE', 'AI đang bận, vui lòng thử lại sau');
+    return json(res, 200, { success: true, data: analysis });
+  }
   if ((normalized === '/api/users' || normalized === '/api/v1/users') && method === 'GET') {
     const rows = await database`SELECT * FROM users WHERE is_active=true ORDER BY created_at DESC LIMIT 100`;
     return json(res, 200, rows.map(userShape));
