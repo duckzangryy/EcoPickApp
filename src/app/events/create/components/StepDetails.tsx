@@ -5,6 +5,8 @@ import { Controller } from 'react-hook-form';
 import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { Colors, Fonts } from '../../../../constants';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 import { EVENT_TYPES } from '../constants';
 import FieldError from './FieldError';
 
@@ -53,6 +55,8 @@ const StepDetails = ({
   params,
 }: StepDetailsProps) => {
   const router = useRouter();
+  const theme = useThemeStore((s) => s.theme);
+  const colors = getColors(theme);
 
   const openLocationPicker = () => {
     router.push({
@@ -65,15 +69,17 @@ const StepDetails = ({
     } as any);
   };
 
+  const iconWrapBg = theme === 'dark' ? 'rgba(32,105,58,0.2)' : '#F0FDF4';
+
   return (
     <View style={s.stepBody}>
       {/* ─── Section: Event Name ─── */}
       <View style={s.section}>
         <View style={s.sectionHeader}>
-          <View style={s.sectionIconWrap}>
-            <Ionicons name="sparkles" size={14} color={Colors.primary} />
+          <View style={[s.sectionIconWrap, { backgroundColor: iconWrapBg }]}>
+            <Ionicons name="sparkles" size={14} color={colors.primary} />
           </View>
-          <Text style={s.sectionTitle}>{t('createEvent.labels.title', { defaultValue: 'Event Name' })}</Text>
+          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>{t('createEvent.labels.title', { defaultValue: 'Event Name' })}</Text>
           <View style={s.requiredDot} />
         </View>
         <Controller
@@ -81,11 +87,11 @@ const StepDetails = ({
           name="title"
           render={({ field: { onChange, onBlur, value } }) => (
             <>
-              <View style={[s.inputWrap, errors.title && s.inputError]}>
+              <View style={[s.inputWrap, { backgroundColor: colors.card, borderColor: colors.border }, errors.title && s.inputError]}>
                 <TextInput
-                  style={s.input}
+                  style={[s.input, { color: colors.textPrimary }]}
                   placeholder={t('createEvent.placeholders.title')}
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textPlaceholder}
                   value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
@@ -101,10 +107,10 @@ const StepDetails = ({
       {/* ─── Section: Event Type ─── */}
       <View style={s.section}>
         <View style={s.sectionHeader}>
-          <View style={s.sectionIconWrap}>
-            <Ionicons name="pricetag" size={14} color={Colors.primary} />
+          <View style={[s.sectionIconWrap, { backgroundColor: iconWrapBg }]}>
+            <Ionicons name="pricetag" size={14} color={colors.primary} />
           </View>
-          <Text style={s.sectionTitle}>{t('createEvent.labels.type', { defaultValue: 'Event Type' })}</Text>
+          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>{t('createEvent.labels.type', { defaultValue: 'Event Type' })}</Text>
         </View>
         <View style={s.typeWrap}>
           {EVENT_TYPES.map((type) => {
@@ -112,14 +118,18 @@ const StepDetails = ({
             return (
               <TouchableOpacity
                 key={type.id}
-                style={[s.typeChip, isSel && s.typeChipSel]}
+                style={[
+                  s.typeChip,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  isSel && [s.typeChipSel, { borderColor: colors.primary, backgroundColor: theme === 'dark' ? 'rgba(32,105,58,0.2)' : '#F0FDF4' }],
+                ]}
                 onPress={() => setEventType(type.id)}
                 activeOpacity={0.7}
               >
-                <View style={[s.typeIco, isSel && s.typeIcoSel]}>
-                  <Ionicons name={type.icon as any} size={16} color={isSel ? '#fff' : '#64748B'} />
+                <View style={[s.typeIco, { backgroundColor: theme === 'dark' ? colors.border : '#F1F5F9' }, isSel && [s.typeIcoSel, { backgroundColor: colors.primary }]]}>
+                  <Ionicons name={type.icon as any} size={16} color={isSel ? '#fff' : colors.textSecondary} />
                 </View>
-                <Text style={[s.typeText, isSel && s.typeTextSel]}>{t(type.label)}</Text>
+                <Text style={[s.typeText, { color: colors.textSecondary }, isSel && [s.typeTextSel, { color: colors.primary }]]}>{t(type.label)}</Text>
               </TouchableOpacity>
             );
           })}
@@ -129,10 +139,10 @@ const StepDetails = ({
       {/* ─── Section: Description ─── */}
       <View style={s.section}>
         <View style={s.sectionHeader}>
-          <View style={s.sectionIconWrap}>
-            <Ionicons name="document-text" size={14} color={Colors.primary} />
+          <View style={[s.sectionIconWrap, { backgroundColor: iconWrapBg }]}>
+            <Ionicons name="document-text" size={14} color={colors.primary} />
           </View>
-          <Text style={s.sectionTitle}>
+          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>
             {t('createEvent.labels.description', { defaultValue: 'Description' })}
           </Text>
         </View>
@@ -141,11 +151,11 @@ const StepDetails = ({
           name="description"
           render={({ field: { onChange, onBlur, value } }) => (
             <>
-              <View style={[s.textAreaWrap, errors.description && s.inputError]}>
+              <View style={[s.textAreaWrap, { backgroundColor: colors.card, borderColor: colors.border }, errors.description && s.inputError]}>
                 <TextInput
-                  style={s.textArea}
+                  style={[s.textArea, { color: colors.textPrimary }]}
                   placeholder={t('createEvent.placeholders.description')}
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textPlaceholder}
                   value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
@@ -159,7 +169,7 @@ const StepDetails = ({
                 ) : (
                   <View />
                 )}
-                <Text style={s.charCount}>{(value || '').length}/500</Text>
+                <Text style={[s.charCount, { color: colors.textPlaceholder }]}>{(value || '').length}/500</Text>
               </View>
             </>
           )}
@@ -169,10 +179,10 @@ const StepDetails = ({
       {/* ─── Section: Location ─── */}
       <View style={s.section}>
         <View style={s.sectionHeader}>
-          <View style={s.sectionIconWrap}>
-            <Ionicons name="location" size={14} color={Colors.primary} />
+          <View style={[s.sectionIconWrap, { backgroundColor: iconWrapBg }]}>
+            <Ionicons name="location" size={14} color={colors.primary} />
           </View>
-          <Text style={s.sectionTitle}>{t('createEvent.labels.location', { defaultValue: 'Location' })}</Text>
+          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>{t('createEvent.labels.location', { defaultValue: 'Location' })}</Text>
           <View style={s.requiredDot} />
         </View>
         <Controller
@@ -181,24 +191,24 @@ const StepDetails = ({
           render={({ field: { onChange, onBlur, value } }) => (
             <>
               <LocationSyncEffect paramsLocation={params.location} onChange={onChange} value={value} />
-              <View style={[s.inputWrap, errors.location && s.inputError]}>
+              <View style={[s.inputWrap, { backgroundColor: colors.card, borderColor: colors.border }, errors.location && s.inputError]}>
                 <TextInput
-                  style={s.input}
+                  style={[s.input, { color: colors.textPrimary }]}
                   placeholder={t('createEvent.placeholders.location')}
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textPlaceholder}
                   value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
                 />
-                <TouchableOpacity style={s.mapBtn} onPress={openLocationPicker} activeOpacity={0.7}>
+                <TouchableOpacity style={[s.mapBtn, { backgroundColor: colors.primary }]} onPress={openLocationPicker} activeOpacity={0.7}>
                   <Ionicons name="map" size={14} color="#fff" />
                 </TouchableOpacity>
               </View>
 
               {address ? (
                 <View style={s.addressRow}>
-                  <Ionicons name="navigate-outline" size={14} color={Colors.primary} />
-                  <Text style={s.addressText} numberOfLines={2}>
+                  <Ionicons name="navigate-outline" size={14} color={colors.primary} />
+                  <Text style={[s.addressText, { color: colors.textSecondary }]} numberOfLines={2}>
                     {address}
                   </Text>
                 </View>
@@ -213,23 +223,23 @@ const StepDetails = ({
       {/* ─── Section: Cover Image ─── */}
       <View style={s.section}>
         <View style={s.sectionHeader}>
-          <View style={s.sectionIconWrap}>
-            <Ionicons name="image" size={14} color={Colors.primary} />
+          <View style={[s.sectionIconWrap, { backgroundColor: iconWrapBg }]}>
+            <Ionicons name="image" size={14} color={colors.primary} />
           </View>
-          <Text style={s.sectionTitle}>
+          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>
             {t('createEvent.labels.coverImage')}
           </Text>
         </View>
-        <TouchableOpacity style={s.coverBtn} onPress={pickCoverImage} activeOpacity={0.8}>
+        <TouchableOpacity style={[s.coverBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={pickCoverImage} activeOpacity={0.8}>
           {coverImage ? (
             <Image source={{ uri: coverImage }} style={s.coverImg} />
           ) : (
             <View style={s.coverEmpty}>
-              <View style={s.coverIconWrap}>
-                <Ionicons name="cloud-upload-outline" size={28} color={Colors.primary} />
+              <View style={[s.coverIconWrap, { backgroundColor: iconWrapBg }]}>
+                <Ionicons name="cloud-upload-outline" size={28} color={colors.primary} />
               </View>
-              <Text style={s.coverTitle}>{t('createEvent.placeholders.coverHint')}</Text>
-              <Text style={s.coverSubtext}>JPG, PNG — Max 5MB</Text>
+              <Text style={[s.coverTitle, { color: colors.textPrimary }]}>{t('createEvent.placeholders.coverHint')}</Text>
+              <Text style={[s.coverSubtext, { color: colors.textSecondary }]}>JPG, PNG — Max 5MB</Text>
             </View>
           )}
         </TouchableOpacity>

@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 
 import { Colors, Fonts } from '../../../../constants';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 import { DIFFICULTIES, EQUIPMENT_OPTIONS } from '../constants';
 import { FieldError } from './FieldError';
 
@@ -66,6 +68,8 @@ const StepSettings = ({
   selectedEquipment,
   toggleEquipment,
 }: StepSettingsProps) => {
+  const theme = useThemeStore((s) => s.theme);
+  const colors = getColors(theme);
   const [showAddModal, setShowAddModal] = useState(false);
   const [customLabel, setCustomLabel] = useState('');
   const [customIcon, setCustomIcon] = useState('hammer-outline');
@@ -83,15 +87,17 @@ const StepSettings = ({
     setShowAddModal(false);
   };
 
+  const iconWrapBg = theme === 'dark' ? 'rgba(32,105,58,0.2)' : '#F0FDF4';
+
   return (
     <View style={s.container}>
       {/* ─── Difficulty ─── */}
       <View style={s.section}>
         <View style={s.sectionHeader}>
-          <View style={s.sectionIconWrap}>
-            <Ionicons name="fitness" size={14} color={Colors.primary} />
+          <View style={[s.sectionIconWrap, { backgroundColor: iconWrapBg }]}>
+            <Ionicons name="fitness" size={14} color={colors.primary} />
           </View>
-          <Text style={s.sectionTitle}>
+          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>
             {t('createEvent.settings.difficulty')}
           </Text>
         </View>
@@ -100,21 +106,28 @@ const StepSettings = ({
           {DIFFICULTIES.map((diff) => {
             const isSel = difficulty === diff.id;
             const meta = DIFF_ICONS[diff.id];
+            const selBg = theme === 'dark'
+              ? (diff.id === 'easy' ? '#173A27' : diff.id === 'medium' ? '#3B3215' : '#3D2020')
+              : meta.bg;
             return (
               <TouchableOpacity
                 key={diff.id}
-                style={[s.diffCard, isSel && { borderColor: meta.color, backgroundColor: meta.bg }]}
+                style={[
+                  s.diffCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  isSel && { borderColor: meta.color, backgroundColor: selBg },
+                ]}
                 onPress={() => setDifficulty(diff.id)}
                 activeOpacity={0.7}
               >
-                <View style={[s.diffIco, { backgroundColor: isSel ? meta.color : '#F1F5F9' }]}>
+                <View style={[s.diffIco, { backgroundColor: isSel ? meta.color : (theme === 'dark' ? colors.border : '#F1F5F9') }]}>
                   <Ionicons
                     name={meta.icon as any}
                     size={22}
-                    color={isSel ? '#fff' : '#94A3B8'}
+                    color={isSel ? '#fff' : colors.textPlaceholder}
                   />
                 </View>
-                <Text style={[s.diffText, isSel && { color: meta.color, fontFamily: Fonts.bold }]}>
+                <Text style={[s.diffText, { color: isSel ? meta.color : colors.textSecondary }, isSel && { fontFamily: Fonts.bold }]}>
                   {t(diff.label)}
                 </Text>
                 {isSel && (
@@ -131,10 +144,10 @@ const StepSettings = ({
       {/* ─── Participants ─── */}
       <View style={s.section}>
         <View style={s.sectionHeader}>
-          <View style={s.sectionIconWrap}>
-            <Ionicons name="people" size={14} color={Colors.primary} />
+          <View style={[s.sectionIconWrap, { backgroundColor: iconWrapBg }]}>
+            <Ionicons name="people" size={14} color={colors.primary} />
           </View>
-          <Text style={s.sectionTitle}>
+          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>
             {t('createEvent.settings.participants')}
           </Text>
         </View>
@@ -144,18 +157,18 @@ const StepSettings = ({
           name="maxParticipants"
           render={({ field: { onChange, onBlur, value } }) => (
             <>
-              <View style={[s.inputWrap, errors.maxParticipants && s.inputError]}>
-                <Ionicons name="people-outline" size={18} color="#94A3B8" />
+              <View style={[s.inputWrap, { backgroundColor: colors.card, borderColor: colors.border }, errors.maxParticipants && s.inputError]}>
+                <Ionicons name="people-outline" size={18} color={colors.textPlaceholder} />
                 <TextInput
-                  style={s.input}
+                  style={[s.input, { color: colors.textPrimary }]}
                   keyboardType="numeric"
                   placeholder="30"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textPlaceholder}
                   value={value ? value.toString() : ''}
                   onChangeText={(txt) => onChange(parseInt(txt) || 0)}
                   onBlur={onBlur}
                 />
-                <Text style={s.inputSuffix}>
+                <Text style={[s.inputSuffix, { color: colors.textSecondary }]}>
                   {t('createEvent.settings.people', { defaultValue: 'people' })}
                 </Text>
               </View>
@@ -170,10 +183,10 @@ const StepSettings = ({
       {/* ─── Equipment ─── */}
       <View style={s.section}>
         <View style={s.sectionHeader}>
-          <View style={s.sectionIconWrap}>
-            <Ionicons name="build" size={14} color={Colors.primary} />
+          <View style={[s.sectionIconWrap, { backgroundColor: iconWrapBg }]}>
+            <Ionicons name="build" size={14} color={colors.primary} />
           </View>
-          <Text style={s.sectionTitle}>
+          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>
             {t('createEvent.settings.equipment')}
           </Text>
         </View>
@@ -185,16 +198,20 @@ const StepSettings = ({
             return (
               <TouchableOpacity
                 key={item}
-                style={[s.equipChip, isSel && s.equipChipSel]}
+                style={[
+                  s.equipChip,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  isSel && [s.equipChipSel, { backgroundColor: colors.primary, borderColor: colors.primary }],
+                ]}
                 onPress={() => toggleEquipment(item)}
                 activeOpacity={0.7}
               >
                 <Ionicons
                   name={iconName as any}
                   size={16}
-                  color={isSel ? '#fff' : '#64748B'}
+                  color={isSel ? '#fff' : colors.textSecondary}
                 />
-                <Text style={[s.equipText, isSel && s.equipTextSel]}>
+                <Text style={[s.equipText, { color: colors.textSecondary }, isSel && [s.equipTextSel, { color: '#fff' }]]}>
                   {t(`createEvent.equipment.${item}`, { defaultValue: item })}
                 </Text>
                 {isSel && (
@@ -210,16 +227,20 @@ const StepSettings = ({
             return (
               <TouchableOpacity
                 key={item.label}
-                style={[s.equipChip, isSel && s.equipChipSel]}
+                style={[
+                  s.equipChip,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  isSel && [s.equipChipSel, { backgroundColor: colors.primary, borderColor: colors.primary }],
+                ]}
                 onPress={() => toggleEquipment(item.label)}
                 activeOpacity={0.7}
               >
                 <Ionicons
                   name={item.icon as any}
                   size={16}
-                  color={isSel ? '#fff' : '#64748B'}
+                  color={isSel ? '#fff' : colors.textSecondary}
                 />
-                <Text style={[s.equipText, isSel && s.equipTextSel]}>
+                <Text style={[s.equipText, { color: colors.textSecondary }, isSel && [s.equipTextSel, { color: '#fff' }]]}>
                   {item.label}
                 </Text>
                 {isSel && (
@@ -231,12 +252,12 @@ const StepSettings = ({
 
           {/* Add custom button */}
           <TouchableOpacity
-            style={s.addEquipBtn}
+            style={[s.addEquipBtn, { borderColor: colors.primary, backgroundColor: theme === 'dark' ? 'rgba(32,105,58,0.2)' : 'rgba(32,105,58,0.04)' }]}
             onPress={() => setShowAddModal(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="add-circle-outline" size={16} color={Colors.primary} />
-            <Text style={s.addEquipText}>
+            <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+            <Text style={[s.addEquipText, { color: colors.primary }]}>
               {t('createEvent.equipment.addCustom', { defaultValue: 'Add' })}
             </Text>
           </TouchableOpacity>
@@ -246,10 +267,10 @@ const StepSettings = ({
       {/* ─── Eco Points ─── */}
       <View style={s.section}>
         <View style={s.sectionHeader}>
-          <View style={[s.sectionIconWrap, { backgroundColor: '#FEF9C3' }]}>
+          <View style={[s.sectionIconWrap, { backgroundColor: theme === 'dark' ? '#3B3215' : '#FEF9C3' }]}>
             <Ionicons name="leaf" size={14} color="#EAB308" />
           </View>
-          <Text style={s.sectionTitle}>
+          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>
             {t('createEvent.settings.ecoPoints')}
           </Text>
         </View>
@@ -259,20 +280,20 @@ const StepSettings = ({
           name="ecoPointReward"
           render={({ field: { onChange, onBlur, value } }) => (
             <>
-              <View style={[s.ecoWrap, errors.ecoPointReward && s.inputError]}>
-                <View style={s.ecoLeaf}>
+              <View style={[s.ecoWrap, { backgroundColor: theme === 'dark' ? colors.card : '#FFFEF5', borderColor: theme === 'dark' ? colors.border : '#FEF3C7' }, errors.ecoPointReward && s.inputError]}>
+                <View style={[s.ecoLeaf, { backgroundColor: theme === 'dark' ? '#3B3215' : '#FEF9C3' }]}>
                   <Ionicons name="leaf" size={16} color="#EAB308" />
                 </View>
                 <TextInput
-                  style={s.input}
+                  style={[s.input, { color: colors.textPrimary }]}
                   keyboardType="numeric"
                   placeholder="50"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textPlaceholder}
                   value={value ? value.toString() : ''}
                   onChangeText={(txt) => onChange(parseInt(txt) || 0)}
                   onBlur={onBlur}
                 />
-                <Text style={s.inputSuffix}>{t('createEvent.settings.point')}</Text>
+                <Text style={[s.inputSuffix, { color: colors.textSecondary }]}>{t('createEvent.settings.point')}</Text>
               </View>
               {errors.ecoPointReward && (
                 <FieldError message={t(errors.ecoPointReward.message as string)} />
@@ -296,27 +317,27 @@ const StepSettings = ({
           <TouchableWithoutFeedback onPress={() => setShowAddModal(false)}>
             <View style={s.modalOverlay}>
               <TouchableWithoutFeedback>
-                <View style={s.modalSheet}>
+                <View style={[s.modalSheet, { backgroundColor: colors.card }]}>
                   {/* Handle bar */}
-                  <View style={s.modalHandle} />
+                  <View style={[s.modalHandle, { backgroundColor: colors.borderMedium }]} />
 
-                  <Text style={s.modalTitle}>
+                  <Text style={[s.modalTitle, { color: colors.textPrimary }]}>
                     {t('createEvent.equipment.addTitle', { defaultValue: 'Add Equipment' })}
                   </Text>
 
                   {/* Label input */}
                   <View style={s.modalBody}>
-                    <Text style={s.modalInputLabel}>
+                    <Text style={[s.modalInputLabel, { color: colors.textSecondary }]}>
                       {t('createEvent.equipment.name', { defaultValue: 'Name' })}
                     </Text>
-                    <View style={s.modalInputWrap}>
-                      <Ionicons name={customIcon as any} size={18} color={Colors.primary} />
+                    <View style={[s.modalInputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <Ionicons name={customIcon as any} size={18} color={colors.primary} />
                       <TextInput
-                        style={s.modalInput}
+                        style={[s.modalInput, { color: colors.textPrimary }]}
                         placeholder={t('createEvent.equipment.namePlaceholder', {
                           defaultValue: 'e.g. Bucket, Rope...',
                         })}
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={colors.textPlaceholder}
                         value={customLabel}
                         onChangeText={setCustomLabel}
                         autoFocus
@@ -325,7 +346,7 @@ const StepSettings = ({
                     </View>
 
                     {/* Icon picker */}
-                    <Text style={[s.modalInputLabel, { marginTop: 20 }]}>
+                    <Text style={[s.modalInputLabel, { color: colors.textSecondary, marginTop: 20 }]}>
                       {t('createEvent.equipment.icon', { defaultValue: 'Icon' })}
                     </Text>
                     <View style={s.iconGrid}>
@@ -334,14 +355,18 @@ const StepSettings = ({
                         return (
                           <TouchableOpacity
                             key={ico}
-                            style={[s.iconOption, sel && s.iconOptionSel]}
+                            style={[
+                              s.iconOption,
+                              { backgroundColor: colors.background, borderColor: colors.border },
+                              sel && [s.iconOptionSel, { backgroundColor: colors.primary, borderColor: colors.primary }],
+                            ]}
                             onPress={() => setCustomIcon(ico)}
                             activeOpacity={0.7}
                           >
                             <Ionicons
                               name={ico as any}
                               size={20}
-                              color={sel ? '#fff' : '#64748B'}
+                              color={sel ? '#fff' : colors.textSecondary}
                             />
                           </TouchableOpacity>
                         );
@@ -351,14 +376,14 @@ const StepSettings = ({
                     {/* Action buttons */}
                     <View style={s.modalActions}>
                       <TouchableOpacity
-                        style={s.modalCancelBtn}
+                        style={[s.modalCancelBtn, { backgroundColor: theme === 'dark' ? colors.border : '#F1F5F9' }]}
                         onPress={() => setShowAddModal(false)}
                         activeOpacity={0.7}
                       >
-                        <Text style={s.modalCancelText}>{t('common.cancel')}</Text>
+                        <Text style={[s.modalCancelText, { color: colors.textSecondary }]}>{t('common.cancel')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={[s.modalAddBtn, !customLabel.trim() && { opacity: 0.4 }]}
+                        style={[s.modalAddBtn, { backgroundColor: colors.primary }, !customLabel.trim() && { opacity: 0.4 }]}
                         onPress={handleAddCustom}
                         activeOpacity={0.8}
                         disabled={!customLabel.trim()}

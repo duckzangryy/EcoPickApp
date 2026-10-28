@@ -23,6 +23,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useCreateEvent } from '@/hooks/useEventQueries';
 import { useAuthStore } from '@/stores/authStore';
+import { useThemeStore } from '@/stores/themeStore';
+import { getColors } from '@/constants/Colors';
 import { formatDateTime } from '@/utils/formatDatetime';
 import * as ImageManipulator from 'expo-image-manipulator';
 import Toast from 'react-native-toast-message';
@@ -35,6 +37,8 @@ import { CreateEventFormData, createEventSchema, STEPS } from './constants';
 export default function CreateEventScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const theme = useThemeStore((st) => st.theme);
+  const colors = getColors(theme);
   const user = useAuthStore((st) => st.user);
   const createEvent = useCreateEvent();
   const scrollRef = useRef<ScrollView>(null);
@@ -283,22 +287,22 @@ export default function CreateEventScreen() {
   });
 
   return (
-    <View style={s.root}>
-      <StatusBar style="dark" />
+    <View style={[s.root, { backgroundColor: colors.background }]}>
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
 
       {/* ─── Header ─── */}
-      <SafeAreaView edges={['top']} style={s.headerArea}>
+      <SafeAreaView edges={['top']} style={[s.headerArea, { backgroundColor: colors.card }]}>
         <View style={s.header}>
           <TouchableOpacity
-            style={s.closeBtn}
+            style={[s.closeBtn, { backgroundColor: theme === 'dark' ? colors.border : '#F1F5F9' }]}
             onPress={() => router.back()}
             activeOpacity={0.7}
           >
-            <Ionicons name="close" size={20} color="#475569" />
+            <Ionicons name="close" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
           <View style={s.headerCenter}>
-            <Text style={s.headerTitle}>{t('createEvent.title')}</Text>
-            <Text style={s.headerSubtitle}>
+            <Text style={[s.headerTitle, { color: colors.textPrimary }]}>{t('createEvent.title')}</Text>
+            <Text style={[s.headerSubtitle, { color: colors.textSecondary }]}>
               {t('createEvent.step', { defaultValue: 'Step' })} {activeStep + 1}{' '}
               {t('createEvent.of', { defaultValue: 'of' })} {STEPS.length} —{' '}
               {t(currentStep.labelKey as any)}
@@ -308,8 +312,8 @@ export default function CreateEventScreen() {
         </View>
 
         {/* Progress bar */}
-        <View style={s.progressTrack}>
-          <Animated.View style={[s.progressFill, { width: progressWidth }]} />
+        <View style={[s.progressTrack, { backgroundColor: colors.borderMedium }]}>
+          <Animated.View style={[s.progressFill, { width: progressWidth, backgroundColor: colors.primary }]} />
         </View>
 
         {/* Step pills */}
@@ -320,21 +324,31 @@ export default function CreateEventScreen() {
             return (
               <TouchableOpacity
                 key={step.key}
-                style={[s.stepPill, active && s.stepPillActive, done && s.stepPillDone]}
+                style={[
+                  s.stepPill,
+                  { backgroundColor: theme === 'dark' ? colors.card : '#F8FAFC', borderColor: colors.border },
+                  active && [s.stepPillActive, { backgroundColor: theme === 'dark' ? 'rgba(32,105,58,0.2)' : '#F0FDF4', borderColor: colors.primary }],
+                  done && [s.stepPillDone, { backgroundColor: theme === 'dark' ? colors.card : '#fff', borderColor: theme === 'dark' ? colors.primary : '#DCFCE7' }],
+                ]}
                 onPress={() => idx < activeStep && setActiveStep(idx)}
                 activeOpacity={idx < activeStep ? 0.7 : 1}
               >
                 {done ? (
-                  <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
+                  <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
                 ) : (
                   <Ionicons
                     name={step.icon as any}
                     size={14}
-                    color={active ? Colors.primary : '#94A3B8'}
+                    color={active ? colors.primary : colors.textPlaceholder}
                   />
                 )}
                 <Text
-                  style={[s.stepPillText, active && s.stepPillTextActive, done && s.stepPillTextDone]}
+                  style={[
+                    s.stepPillText,
+                    { color: colors.textSecondary },
+                    active && [s.stepPillTextActive, { color: colors.primary }],
+                    done && [s.stepPillTextDone, { color: colors.primary }],
+                  ]}
                 >
                   {t(step.labelKey as any)}
                 </Text>
@@ -402,7 +416,7 @@ export default function CreateEventScreen() {
       </KeyboardAvoidingView>
 
       {/* ─── Bottom Bar ─── */}
-      <SafeAreaView edges={['bottom']} style={s.bottomArea}>
+      <SafeAreaView edges={['bottom']} style={[s.bottomArea, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
         <View style={s.bottomBar}>
           {activeStep > 0 ? (
             <TouchableOpacity
@@ -413,21 +427,21 @@ export default function CreateEventScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Ionicons name="chevron-back" size={18} color="#475569" />
-              <Text style={s.backBtnText}>{t('common.back')}</Text>
+              <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
+              <Text style={[s.backBtnText, { color: colors.textSecondary }]}>{t('common.back')}</Text>
             </TouchableOpacity>
           ) : (
             <View style={s.backPlaceholder} />
           )}
 
           {!isLastStep ? (
-            <TouchableOpacity style={s.nextBtn} onPress={goNext} activeOpacity={0.8}>
+            <TouchableOpacity style={[s.nextBtn, { backgroundColor: colors.primary }]} onPress={goNext} activeOpacity={0.8}>
               <Text style={s.nextBtnText}>{t('common.next')}</Text>
               <Ionicons name="chevron-forward" size={18} color="#fff" />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              style={[s.publishBtn, { backgroundColor: Colors.primary }, createEvent.isPending && { opacity: 0.7 }]}
+              style={[s.publishBtn, { backgroundColor: colors.primary }, createEvent.isPending && { opacity: 0.7 }]}
               onPress={handleSubmit(onSubmit as any)}
               activeOpacity={0.8}
               disabled={createEvent.isPending}

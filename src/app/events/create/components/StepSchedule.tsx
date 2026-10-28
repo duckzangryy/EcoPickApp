@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 
 import { Colors, Fonts } from '../../../../constants';
+import { getColors } from '@/constants/Colors';
+import { useThemeStore } from '@/stores/themeStore';
 
 interface StepScheduleProps {
   t: any;
@@ -39,6 +41,8 @@ const StepSchedule = ({
   durationHrs,
   durationMins,
 }: StepScheduleProps) => {
+  const theme = useThemeStore((s) => s.theme);
+  const colors = getColors(theme);
   const [tempDate, setTempDate] = useState<Date>(new Date());
 
   const openPicker = (type: string) => {
@@ -94,36 +98,36 @@ const StepSchedule = ({
   return (
     <View style={s.container}>
       {/* ─── Start ─── */}
-      <View style={s.card}>
+      <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={s.cardHeader}>
-          <View style={[s.cardDot, { backgroundColor: Colors.primary }]} />
-          <Text style={s.cardLabel}>
+          <View style={[s.cardDot, { backgroundColor: colors.primary }]} />
+          <Text style={[s.cardLabel, { color: colors.textPrimary }]}>
             {t('createEvent.schedule.startsAt')}
           </Text>
         </View>
 
         <View style={s.row}>
           <TouchableOpacity
-            style={s.dateBtn}
+            style={[s.dateBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
             onPress={() => openPicker('startDate')}
             activeOpacity={0.6}
           >
-            <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+            <Ionicons name="calendar-outline" size={18} color={colors.primary} />
             <View>
-              <Text style={s.btnLabel}>{t('createEvent.schedule.date')}</Text>
-              <Text style={s.btnValue}>{dayjs(startDate).format('ddd, MMM D')}</Text>
+              <Text style={[s.btnLabel, { color: colors.textPlaceholder }]}>{t('createEvent.schedule.date')}</Text>
+              <Text style={[s.btnValue, { color: colors.textPrimary }]}>{dayjs(startDate).format('ddd, MMM D')}</Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={s.timeBtn}
+            style={[s.timeBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
             onPress={() => openPicker('startTime')}
             activeOpacity={0.6}
           >
-            <Ionicons name="time-outline" size={18} color={Colors.primary} />
+            <Ionicons name="time-outline" size={18} color={colors.primary} />
             <View>
-              <Text style={s.btnLabel}>{t('createEvent.schedule.time')}</Text>
-              <Text style={s.btnValue}>{dayjs(startDate).format('hh:mm A')}</Text>
+              <Text style={[s.btnLabel, { color: colors.textPlaceholder }]}>{t('createEvent.schedule.time')}</Text>
+              <Text style={[s.btnValue, { color: colors.textPrimary }]}>{dayjs(startDate).format('hh:mm A')}</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -131,60 +135,60 @@ const StepSchedule = ({
 
       {/* ─── Duration badge ─── */}
       <View style={s.durationRow}>
-        <View style={s.durationLine} />
-        <View style={s.durationBadge}>
-          <Ionicons name="hourglass-outline" size={14} color={Colors.primary} />
-          <Text style={s.durationText}>{durationText}</Text>
+        <View style={[s.durationLine, { backgroundColor: colors.border }]} />
+        <View style={[s.durationBadge, { backgroundColor: theme === 'dark' ? 'rgba(32,105,58,0.2)' : '#F0FDF4', borderColor: theme === 'dark' ? colors.primaryBorder : '#DCFCE7' }]}>
+          <Ionicons name="hourglass-outline" size={14} color={colors.primary} />
+          <Text style={[s.durationText, { color: colors.primary }]}>{durationText}</Text>
         </View>
-        <View style={s.durationLine} />
+        <View style={[s.durationLine, { backgroundColor: colors.border }]} />
       </View>
 
       {/* ─── End ─── */}
-      <View style={s.card}>
+      <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={s.cardHeader}>
           <View style={[s.cardDot, { backgroundColor: '#EF4444' }]} />
-          <Text style={s.cardLabel}>
+          <Text style={[s.cardLabel, { color: colors.textPrimary }]}>
             {t('createEvent.schedule.endsAt')}
           </Text>
         </View>
 
         <View style={s.row}>
           <TouchableOpacity
-            style={s.dateBtn}
+            style={[s.dateBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
             onPress={() => openPicker('endDate')}
             activeOpacity={0.6}
           >
             <Ionicons name="calendar-outline" size={18} color="#EF4444" />
             <View>
-              <Text style={s.btnLabel}>{t('createEvent.schedule.date')}</Text>
-              <Text style={s.btnValue}>{dayjs(endDate).format('ddd, MMM D')}</Text>
+              <Text style={[s.btnLabel, { color: colors.textPlaceholder }]}>{t('createEvent.schedule.date')}</Text>
+              <Text style={[s.btnValue, { color: colors.textPrimary }]}>{dayjs(endDate).format('ddd, MMM D')}</Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={s.timeBtn}
+            style={[s.timeBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
             onPress={() => openPicker('endTime')}
             activeOpacity={0.6}
           >
             <Ionicons name="time-outline" size={18} color="#EF4444" />
             <View>
-              <Text style={s.btnLabel}>{t('createEvent.schedule.time')}</Text>
-              <Text style={s.btnValue}>{dayjs(endDate).format('hh:mm A')}</Text>
+              <Text style={[s.btnLabel, { color: colors.textPlaceholder }]}>{t('createEvent.schedule.time')}</Text>
+              <Text style={[s.btnValue, { color: colors.textPrimary }]}>{dayjs(endDate).format('hh:mm A')}</Text>
             </View>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* ─── Duration Summary ─── */}
-      <View style={s.summary}>
-        <View style={s.summaryIcon}>
-          <Ionicons name="timer-outline" size={20} color={Colors.primary} />
+      <View style={[s.summary, { backgroundColor: theme === 'dark' ? 'rgba(32,105,58,0.15)' : '#F0FDF4', borderColor: theme === 'dark' ? colors.primaryBorder : '#DCFCE7' }]}>
+        <View style={[s.summaryIcon, { backgroundColor: colors.card, borderColor: theme === 'dark' ? colors.primaryBorder : '#DCFCE7' }]}>
+          <Ionicons name="timer-outline" size={20} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.summaryLabel}>
+          <Text style={[s.summaryLabel, { color: colors.textSecondary }]}>
             {t('createEvent.schedule.duration')}
           </Text>
-          <Text style={s.summaryValue}>{durationText}</Text>
+          <Text style={[s.summaryValue, { color: colors.primary }]}>{durationText}</Text>
         </View>
       </View>
 
@@ -194,18 +198,18 @@ const StepSchedule = ({
           <TouchableWithoutFeedback onPress={() => setShowPicker(null)}>
             <View style={s.modalOverlay}>
               <TouchableWithoutFeedback>
-                <View style={s.modalSheet}>
-                  <View style={s.modalHeader}>
+                <View style={[s.modalSheet, { backgroundColor: colors.card }]}>
+                  <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
                     <TouchableOpacity onPress={() => setShowPicker(null)}>
-                      <Text style={s.modalCancel}>{t('common.cancel')}</Text>
+                      <Text style={[s.modalCancel, { color: colors.textSecondary }]}>{t('common.cancel')}</Text>
                     </TouchableOpacity>
-                    <Text style={s.modalTitle}>
+                    <Text style={[s.modalTitle, { color: colors.textPrimary }]}>
                       {pickerMode === 'date'
                         ? t('createEvent.schedule.selectDate')
                         : t('createEvent.schedule.selectTime')}
                     </Text>
                     <TouchableOpacity onPress={handleIOSConfirm}>
-                      <Text style={s.modalDone}>
+                      <Text style={[s.modalDone, { color: colors.primary }]}>
                         {t('common.done', { defaultValue: 'Done' })}
                       </Text>
                     </TouchableOpacity>
@@ -215,8 +219,8 @@ const StepSchedule = ({
                       value={tempDate}
                       mode={pickerMode as 'date' | 'time'}
                       display="spinner"
-                      themeVariant="light"
-                      textColor="#000000"
+                      themeVariant={theme}
+                      textColor={colors.textPrimary}
                       onChange={handleIOSChange}
                       minimumDate={minimumDate}
                       style={{ height: 200, width: '100%' }}
